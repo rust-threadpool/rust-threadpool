@@ -65,20 +65,19 @@ impl<'a> Drop for Sentinel<'a> {
 ///
 /// ```rust
 /// use threadpool::ThreadPool;
-/// use std::iter::AdditiveIterator;
 /// use std::sync::mpsc::channel;
 ///
 /// let pool = ThreadPool::new(4);
 ///
 /// let (tx, rx) = channel();
-/// for _ in 0..8 {
+/// for i in 0..8 {
 ///     let tx = tx.clone();
 ///     pool.execute(move|| {
-///         tx.send(1_u32).unwrap();
+///         tx.send(i).unwrap();
 ///     });
 /// }
 ///
-/// assert_eq!(rx.iter().take(8).sum(), 8);
+/// assert_eq!(rx.iter().take(8).fold(0, |a, b| a + b), 28);
 /// ```
 pub struct ThreadPool {
     // How the threadpool communicates with subthreads.
