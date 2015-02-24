@@ -1,0 +1,13 @@
+[package]
+
+name = "threadpool"
+version = "0.1.0"
+authors = ["The Rust Project Developers"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/rust-lang/threadpool"
+homepage = "https://github.com/rust-lang/threadpool"
+documentation = "http://doc.rust-lang.org/threadpool"
+description = """
+A thread pool for running a number of jobs on a fixed set of worker threads.
+"""
