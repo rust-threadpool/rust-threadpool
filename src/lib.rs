@@ -144,6 +144,7 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
 /// A scoped thread pool used to execute functions in parallel.
 ///
 /// `ScopedPool` is different from `TaskPool` in that:
+///
 /// * When dropped, it propagates panics that occur in the worker threads.
 /// * It doesn't require the `'static` bound on the functions that are executed.
 /// * Worker threads are joined when the `ScopedPool` is dropped.
