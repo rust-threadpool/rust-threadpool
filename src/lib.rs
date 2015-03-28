@@ -255,7 +255,7 @@ mod test {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_zero_tasks_panic() {
         ThreadPool::new(0);
     }
@@ -340,13 +340,13 @@ mod test_scoped {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_zero_tasks_panic() {
         ScopedPool::new(0);
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_panic_propagation() {
         let pool = ScopedPool::new(TEST_TASKS);
 
