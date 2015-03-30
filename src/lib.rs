@@ -10,8 +10,6 @@
 
 //! Abstraction of a thread pool for basic parallelism.
 
-#![feature(unsafe_destructor)]
-
 use std::mem;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -48,7 +46,6 @@ impl<'a> Sentinel<'a> {
     }
 }
 
-#[unsafe_destructor]
 impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
@@ -201,7 +198,6 @@ impl<'pool> ScopedPool<'pool> {
     }
 }
 
-#[unsafe_destructor]
 impl<'a> Drop for ScopedPool<'a> {
     fn drop(&mut self) {
         // We need to ensure that the sender is dropped before the JoinGuards
