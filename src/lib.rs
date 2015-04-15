@@ -10,10 +10,13 @@
 
 //! Abstraction of a thread pool for basic parallelism.
 
+#[cfg(feature = "scoped-pool")]
 use std::mem;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::thread::{self, JoinGuard};
+use std::sync::{Arc, Mutex};
+use std::thread;
+#[cfg(feature = "scoped-pool")]
+use std::thread::JoinGuard;
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -165,11 +168,13 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
 ///
 /// assert_eq!(numbers, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 /// ```
+#[cfg(feature = "scoped-pool")]
 pub struct ScopedPool<'pool> {
     sender: Option<Sender<Thunk<'pool>>>,
     _guards: Vec<JoinGuard<'pool, ()>>
 }
 
+#[cfg(feature = "scoped-pool")]
 impl<'pool> ScopedPool<'pool> {
     /// Spawns a new thread pool with `threads` threads.
     ///
@@ -198,6 +203,7 @@ impl<'pool> ScopedPool<'pool> {
     }
 }
 
+#[cfg(feature = "scoped-pool")]
 impl<'a> Drop for ScopedPool<'a> {
     fn drop(&mut self) {
         // We need to ensure that the sender is dropped before the JoinGuards
@@ -206,6 +212,7 @@ impl<'a> Drop for ScopedPool<'a> {
     }
 }
 
+#[cfg(feature = "scoped-pool")]
 fn spawn_scoped_in_pool<'a>(jobs: Arc<Mutex<Receiver<Thunk<'a>>>>) -> JoinGuard<'a, ()>
 {
     thread::scoped(move || {
@@ -299,7 +306,7 @@ mod test {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "scoped-pool"))]
 mod test_scoped {
     use super::ScopedPool;
     use std::sync::mpsc::channel;
