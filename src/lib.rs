@@ -10,6 +10,8 @@
 
 //! Abstraction of a thread pool for basic parallelism.
 
+#![cfg_attr(feature = "scoped-pool", feature(scoped))]
+
 #[cfg(feature = "scoped-pool")]
 use std::mem;
 use std::sync::mpsc::{channel, Sender, Receiver};
