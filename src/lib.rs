@@ -183,13 +183,13 @@ impl<'pool> ScopedPool<'pool> {
     /// # Panics
     ///
     /// This function will panic if `threads` is 0.
-    pub fn new(threads: u32) -> ScopedPool<'pool> {
+    pub fn new(threads: usize) -> ScopedPool<'pool> {
         assert!(threads >= 1);
 
         let (sender, receiver) = channel();
         let receiver = Arc::new(Mutex::new(receiver));
 
-        let mut guards = Vec::with_capacity(threads as usize);
+        let mut guards = Vec::with_capacity(threads);
         for _ in 0..threads {
             guards.push(spawn_scoped_in_pool(receiver.clone()));
         }
@@ -313,7 +313,7 @@ mod test_scoped {
     use super::ScopedPool;
     use std::sync::mpsc::channel;
 
-    const TEST_TASKS: u32 = 4;
+    const TEST_TASKS: usize = 4;
 
     #[test]
     fn test_works_1() {
@@ -327,7 +327,7 @@ mod test_scoped {
             });
         }
 
-        assert_eq!(rx.iter().take(TEST_TASKS as usize).fold(0, |a, b| a + b), TEST_TASKS);
+        assert_eq!(rx.iter().take(TEST_TASKS).fold(0, |a, b| a + b), TEST_TASKS);
     }
 
     #[test]
