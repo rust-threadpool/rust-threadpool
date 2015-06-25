@@ -66,7 +66,7 @@ impl<'a> Drop for Sentinel<'a> {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use threadpool::ThreadPool;
 /// use std::sync::mpsc::channel;
 ///
@@ -153,7 +153,7 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use threadpool::ScopedPool;
 ///
 /// let mut numbers: &mut [u32] = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
