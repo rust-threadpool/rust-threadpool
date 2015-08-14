@@ -10,9 +10,6 @@ script:
   - cargo build --verbose
   - cargo test --verbose
   - cargo doc
-  - if [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
-      cargo test --verbose --features scoped-pool;
-    fi
 after_success:
   - travis-cargo --only nightly doc-upload
 notifications:
