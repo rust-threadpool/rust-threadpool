@@ -76,6 +76,7 @@ impl<'a> Drop for Sentinel<'a> {
 ///
 /// assert_eq!(rx.iter().take(8).fold(0, |a, b| a + b), 28);
 /// ```
+#[derive(Clone)]
 pub struct ThreadPool {
     // How the threadpool communicates with subthreads.
     //
