@@ -3,7 +3,7 @@ threadpool
 
 A thread pool for running a number of jobs on a fixed set of worker threads.
 
-[![Build Status](https://travis-ci.org/rust-lang-deprecated/threadpool.svg?branch=master)](https://travis-ci.org/rust-lang-deprecated/threadpool)
+[![Build Status](https://travis-ci.org/frewsxcv/rust-threadpool.svg?branch=master)](https://travis-ci.org/frewsxcv/rust-threadpool)
 
 [Documentation](http://doc.rust-lang.org/threadpool)
 
