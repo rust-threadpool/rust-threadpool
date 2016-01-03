@@ -54,9 +54,34 @@ impl<'a> Sentinel<'a> {
 impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
-            spawn_in_pool(self.jobs.clone())
+            spawn_sentinel_in_pool(self.jobs.clone())
         }
     }
+}
+
+fn spawn_sentinel_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
+    thread::spawn(move || {
+        // Will spawn a new thread on panic unless it is cancelled.
+        let sentinel = Sentinel::new(&jobs);
+
+        loop {
+            let message = {
+                // Only lock jobs for the time it takes
+                // to get a job, not run it.
+                let lock = jobs.lock().unwrap();
+                lock.recv()
+            };
+
+            match message {
+                Ok(job) => job.call_box(),
+
+                // The Threadpool was dropped.
+                Err(..) => break
+            }
+        }
+
+        sentinel.cancel();
+    });
 }
 
 /// A thread pool used to execute functions in parallel.
@@ -87,7 +112,8 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
-    jobs: Sender<Thunk<'static>>
+    jobs: Sender<Thunk<'static>>,
+    active_count: Arc<Mutex<usize>>,
 }
 
 impl ThreadPool {
@@ -102,12 +128,16 @@ impl ThreadPool {
         let (tx, rx) = channel::<Thunk<'static>>();
         let rx = Arc::new(Mutex::new(rx));
 
+        let mut result = ThreadPool { 
+            jobs: tx,
+            active_count: Arc::new(Mutex::new(0)),
+        };
+
         // Threadpool threads
         for _ in 0..threads {
-            spawn_in_pool(rx.clone());
+            result.spawn_in_pool(rx.clone());
         }
-
-        ThreadPool { jobs: tx }
+        return result;
     }
 
     /// Executes the function `job` on a thread in the pool.
@@ -116,32 +146,43 @@ impl ThreadPool {
     {
         self.jobs.send(Box::new(move || job())).unwrap();
     }
-}
 
-fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
-    thread::spawn(move || {
-        // Will spawn a new thread on panic unless it is cancelled.
-        let sentinel = Sentinel::new(&jobs);
+    /// Returns number of active threads.
+    pub fn get_active_count(&self) -> usize {
+        return *self.active_count.lock().unwrap();
+    }
 
-        loop {
-            let message = {
-                // Only lock jobs for the time it takes
-                // to get a job, not run it.
-                let lock = jobs.lock().unwrap();
-                lock.recv()
-            };
+    fn spawn_in_pool(&mut self,jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
+        let thread_counter = self.active_count.clone();
+        thread::spawn(move || {
+            // Will spawn a new thread on panic unless it is cancelled.
+            let sentinel = Sentinel::new(&jobs);
 
-            match message {
-                Ok(job) => job.call_box(),
+            loop {
+                let message = {
+                    // Only lock jobs for the time it takes
+                    // to get a job, not run it.
+                    let lock = jobs.lock().unwrap();
+                    lock.recv()
+                };
 
-                // The Threadpool was dropped.
-                Err(..) => break
+                match message {
+                    Ok(job) => {
+                        *thread_counter.lock().unwrap() += 1;
+                        job.call_box();
+                        *thread_counter.lock().unwrap() -= 1;
+                    },
+
+                    // The Threadpool was dropped.
+                    Err(..) => break
+                }
             }
-        }
 
-        sentinel.cancel();
-    });
+            sentinel.cancel();
+        });
+    }
 }
+
 
 /// A scoped thread pool used to execute functions in parallel.
 ///
@@ -241,8 +282,30 @@ mod test {
     use super::ThreadPool;
     use std::sync::mpsc::channel;
     use std::sync::{Arc, Barrier};
+    use std::thread::sleep;
+    use std::time::Duration;
 
     const TEST_TASKS: usize = 4;
+
+    #[test]
+    fn test_active_count() {
+        let pool = ThreadPool::new(TEST_TASKS);
+        for _ in 0..TEST_TASKS {
+            pool.execute(move|| {
+                loop {
+                    sleep(Duration::new(10, 0));
+                }
+            });
+        }
+        sleep(Duration::new(3, 0));
+        let active_count = pool.get_active_count();
+        assert!(
+            active_count == TEST_TASKS,
+            "Active thread count {} != {}.",
+            active_count,
+            TEST_TASKS
+        );
+    }
 
     #[test]
     fn test_works() {
