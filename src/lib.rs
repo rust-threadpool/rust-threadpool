@@ -114,6 +114,7 @@ pub struct ThreadPool {
     // quit.
     jobs: Sender<Thunk<'static>>,
     active_count: Arc<Mutex<usize>>,
+    count: usize,
 }
 
 impl ThreadPool {
@@ -131,6 +132,7 @@ impl ThreadPool {
         let mut result = ThreadPool { 
             jobs: tx,
             active_count: Arc::new(Mutex::new(0)),
+            count: threads,
         };
 
         // Threadpool threads
@@ -148,8 +150,13 @@ impl ThreadPool {
     }
 
     /// Returns number of active threads.
-    pub fn get_active_count(&self) -> usize {
+    pub fn active_count(&self) -> usize {
         return *self.active_count.lock().unwrap();
+    }
+
+    /// Returns number created threads.
+    pub fn count(&self) -> usize {
+        return self.count;   
     }
 
     fn spawn_in_pool(&mut self,jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
@@ -298,11 +305,18 @@ mod test {
             });
         }
         sleep(Duration::new(3, 0));
-        let active_count = pool.get_active_count();
+        let active_count = pool.active_count();
         assert!(
             active_count == TEST_TASKS,
             "Active thread count {} != {}.",
             active_count,
+            TEST_TASKS
+        );
+        let initialized_count = pool.count();
+        assert!(
+            initialized_count == TEST_TASKS,
+            "initialized thread count {} != {}.",
+            initialized_count,
             TEST_TASKS
         );
     }
