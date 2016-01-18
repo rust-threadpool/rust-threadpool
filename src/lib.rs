@@ -28,13 +28,19 @@ type Thunk<'a> = Box<FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
     jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
+    thread_counter: &'a Arc<Mutex<usize>>,
+    thread_count_max: &'a Arc<Mutex<usize>>,
     active: bool
 }
 
 impl<'a> Sentinel<'a> {
-    fn new(jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>) -> Sentinel<'a> {
+    fn new(jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
+           thread_counter: &'a Arc<Mutex<usize>>,
+           thread_count_max: &'a Arc<Mutex<usize>>) -> Sentinel<'a> {
         Sentinel {
             jobs: jobs,
+            thread_counter: thread_counter,
+            thread_count_max: thread_count_max,
             active: true
         }
     }
@@ -48,7 +54,8 @@ impl<'a> Sentinel<'a> {
 impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
-            spawn_in_pool(self.jobs.clone())
+            *self.thread_counter.lock().unwrap() -= 1;
+            spawn_in_pool(self.jobs.clone(), self.thread_counter.clone(), self.thread_count_max.clone())
         }
     }
 }
@@ -82,7 +89,10 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
-    jobs: Sender<Thunk<'static>>
+    jobs: Sender<Thunk<'static>>,
+    job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
+    active_count: Arc<Mutex<usize>>,
+    max_count: Arc<Mutex<usize>>,
 }
 
 impl ThreadPool {
@@ -96,13 +106,20 @@ impl ThreadPool {
 
         let (tx, rx) = channel::<Thunk<'static>>();
         let rx = Arc::new(Mutex::new(rx));
+        let active_count = Arc::new(Mutex::new(0));
+        let max_count = Arc::new(Mutex::new(threads));
 
         // Threadpool threads
         for _ in 0..threads {
-            spawn_in_pool(rx.clone());
+            spawn_in_pool(rx.clone(), active_count.clone(), max_count.clone());
         }
 
-        ThreadPool { jobs: tx }
+        ThreadPool {
+            jobs: tx,
+            job_receiver: rx.clone(),
+            active_count: active_count,
+            max_count: max_count
+        }
     }
 
     /// Executes the function `job` on a thread in the pool.
@@ -111,26 +128,63 @@ impl ThreadPool {
     {
         self.jobs.send(Box::new(move || job())).unwrap();
     }
+
+    /// Returns the number of currently active threads.
+    pub fn active_count(&self) -> usize {
+        *self.active_count.lock().unwrap()
+    }
+
+    /// Returns the number of created threads
+    pub fn max_count(&self) -> usize {
+        *self.max_count.lock().unwrap()
+    }
+
+    /// Sets the number of threads to use as `threads`.
+    /// Can be used to change the threadpool size during runtime
+    pub fn set_threads(&mut self, threads: usize) {
+        assert!(threads >= 1);
+        let current_max = self.max_count.lock().unwrap().clone();
+        *self.max_count.lock().unwrap() = threads;
+        if threads > current_max {
+            // Spawn new threads
+            for _ in 0..(threads - current_max) {
+                spawn_in_pool(self.job_receiver.clone(), self.active_count.clone(), self.max_count.clone());
+            }
+        }
+    }
 }
 
-fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
+fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
+                 thread_counter: Arc<Mutex<usize>>,
+                 thread_count_max: Arc<Mutex<usize>>) {
     thread::spawn(move || {
         // Will spawn a new thread on panic unless it is cancelled.
-        let sentinel = Sentinel::new(&jobs);
+        let sentinel = Sentinel::new(&jobs, &thread_counter, &thread_count_max);
 
         loop {
-            let message = {
-                // Only lock jobs for the time it takes
-                // to get a job, not run it.
-                let lock = jobs.lock().unwrap();
-                lock.recv()
-            };
+            // clone values so that the mutexes are not held
+            let thread_counter_val = thread_counter.lock().unwrap().clone();
+            let thread_count_max_val = thread_count_max.lock().unwrap().clone();
+            if thread_counter_val < thread_count_max_val {
+                let message = {
+                    // Only lock jobs for the time it takes
+                    // to get a job, not run it.
+                    let lock = jobs.lock().unwrap();
+                    lock.recv()
+                };
 
-            match message {
-                Ok(job) => job.call_box(),
+                match message {
+                    Ok(job) => {
+                        *thread_counter.lock().unwrap() += 1;
+                        job.call_box();
+                        *thread_counter.lock().unwrap() -= 1;
+                    },
 
-                // The Threadpool was dropped.
-                Err(..) => break
+                    // The Threadpool was dropped.
+                    Err(..) => break
+                }
+            } else {
+                break;
             }
         }
 
@@ -140,11 +194,74 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>) {
 
 #[cfg(test)]
 mod test {
+    #![allow(deprecated)]
     use super::ThreadPool;
     use std::sync::mpsc::channel;
     use std::sync::{Arc, Barrier};
+    use std::thread::sleep_ms;
 
     const TEST_TASKS: usize = 4;
+
+    #[test]
+    fn test_set_threads_increasing() {
+        let new_thread_amount = 6;
+        let mut pool = ThreadPool::new(TEST_TASKS);
+        for _ in 0..TEST_TASKS {
+            pool.execute(move || {
+                loop {
+                    sleep_ms(10000)
+                }
+            });
+        }
+        pool.set_threads(new_thread_amount);
+        for _ in 0..(new_thread_amount - TEST_TASKS) {
+            pool.execute(move || {
+                loop {
+                    sleep_ms(10000)
+                }
+            });
+        }
+        sleep_ms(1000);
+        assert_eq!(pool.active_count(), new_thread_amount);
+    }
+
+    #[test]
+    fn test_set_threads_decreasing() {
+        let new_thread_amount = 2;
+        let mut pool = ThreadPool::new(TEST_TASKS);
+        for _ in 0..TEST_TASKS {
+            pool.execute(move || {
+                1 + 1;
+            });
+        }
+        pool.set_threads(new_thread_amount);
+        for _ in 0..new_thread_amount {
+            pool.execute(move || {
+                loop {
+                    sleep_ms(10000)
+                }
+            });
+        }
+        sleep_ms(1000);
+        assert_eq!(pool.active_count(), new_thread_amount);
+    }
+
+    #[test]
+    fn test_active_count() {
+        let pool = ThreadPool::new(TEST_TASKS);
+        for _ in 0..TEST_TASKS {
+            pool.execute(move|| {
+                loop {
+                    sleep_ms(10000);
+                }
+            });
+        }
+        sleep_ms(1000);
+        let active_count = pool.active_count();
+        assert_eq!(active_count, TEST_TASKS);
+        let initialized_count = pool.max_count();
+        assert_eq!(initialized_count, TEST_TASKS);
+    }
 
     #[test]
     fn test_works() {
