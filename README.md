@@ -23,6 +23,11 @@ and this to your crate root:
 extern crate threadpool;
 ```
 
+## Similar libraries
+
+* [rust-scoped-pool](http://github.com/reem/rust-scoped-pool)
+* [scoped-threadpool-rs](https://github.com/Kimundi/scoped-threadpool-rs)
+
 ## License
 
 Licensed under either of
