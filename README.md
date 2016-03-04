@@ -13,8 +13,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-
-threadpool = "0.2"
+threadpool = "1.0"
 ```
 
 and this to your crate root:

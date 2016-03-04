@@ -1,7 +1,7 @@
 [package]
 
 name = "threadpool"
-version = "0.2.1"
+version = "1.0.0"
 authors = ["The Rust Project Developers"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
