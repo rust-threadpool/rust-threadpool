@@ -11,7 +11,7 @@
 //! Abstraction of a thread pool for basic parallelism.
 
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 trait FnBox {
@@ -28,14 +28,14 @@ type Thunk<'a> = Box<FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
     jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
-    thread_counter: &'a Arc<Mutex<usize>>,
+    thread_counter: &'a Arc<RwLock<usize>>,
     thread_count_max: &'a Arc<Mutex<usize>>,
     active: bool
 }
 
 impl<'a> Sentinel<'a> {
     fn new(jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
-           thread_counter: &'a Arc<Mutex<usize>>,
+           thread_counter: &'a Arc<RwLock<usize>>,
            thread_count_max: &'a Arc<Mutex<usize>>) -> Sentinel<'a> {
         Sentinel {
             jobs: jobs,
@@ -54,7 +54,7 @@ impl<'a> Sentinel<'a> {
 impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
-            *self.thread_counter.lock().unwrap() -= 1;
+            *self.thread_counter.write().unwrap() -= 1;
             spawn_in_pool(self.jobs.clone(), self.thread_counter.clone(), self.thread_count_max.clone())
         }
     }
@@ -91,7 +91,7 @@ pub struct ThreadPool {
     // quit.
     jobs: Sender<Thunk<'static>>,
     job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
-    active_count: Arc<Mutex<usize>>,
+    active_count: Arc<RwLock<usize>>,
     max_count: Arc<Mutex<usize>>,
 }
 
@@ -106,7 +106,7 @@ impl ThreadPool {
 
         let (tx, rx) = channel::<Thunk<'static>>();
         let rx = Arc::new(Mutex::new(rx));
-        let active_count = Arc::new(Mutex::new(0));
+        let active_count = Arc::new(RwLock::new(0));
         let max_count = Arc::new(Mutex::new(threads));
 
         // Threadpool threads
@@ -131,7 +131,7 @@ impl ThreadPool {
 
     /// Returns the number of currently active threads.
     pub fn active_count(&self) -> usize {
-        *self.active_count.lock().unwrap()
+        *self.active_count.read().unwrap()
     }
 
     /// Returns the number of created threads
@@ -155,7 +155,7 @@ impl ThreadPool {
 }
 
 fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
-                 thread_counter: Arc<Mutex<usize>>,
+                 thread_counter: Arc<RwLock<usize>>,
                  thread_count_max: Arc<Mutex<usize>>) {
     thread::spawn(move || {
         // Will spawn a new thread on panic unless it is cancelled.
@@ -163,7 +163,7 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
 
         loop {
             // clone values so that the mutexes are not held
-            let thread_counter_val = thread_counter.lock().unwrap().clone();
+            let thread_counter_val = thread_counter.read().unwrap().clone();
             let thread_count_max_val = thread_count_max.lock().unwrap().clone();
             if thread_counter_val < thread_count_max_val {
                 let message = {
@@ -175,9 +175,9 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
 
                 match message {
                     Ok(job) => {
-                        *thread_counter.lock().unwrap() += 1;
+                        *thread_counter.write().unwrap() += 1;
                         job.call_box();
-                        *thread_counter.lock().unwrap() -= 1;
+                        *thread_counter.write().unwrap() -= 1;
                     },
 
                     // The Threadpool was dropped.
