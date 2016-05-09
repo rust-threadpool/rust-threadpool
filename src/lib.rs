@@ -13,7 +13,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
+use std::thread::Builder;
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -28,6 +28,7 @@ impl<F: FnOnce()> FnBox for F {
 type Thunk<'a> = Box<FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
+    name: Option<String>,
     jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
     thread_counter: &'a Arc<AtomicUsize>,
     thread_count_max: &'a Arc<AtomicUsize>,
@@ -35,10 +36,12 @@ struct Sentinel<'a> {
 }
 
 impl<'a> Sentinel<'a> {
-    fn new(jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
+    fn new(name: Option<String>,
+           jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
            thread_counter: &'a Arc<AtomicUsize>,
            thread_count_max: &'a Arc<AtomicUsize>) -> Sentinel<'a> {
         Sentinel {
+            name: name,
             jobs: jobs,
             thread_counter: thread_counter,
             thread_count_max: thread_count_max,
@@ -56,7 +59,10 @@ impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
             self.thread_counter.fetch_sub(1, Ordering::SeqCst);
-            spawn_in_pool(self.jobs.clone(), self.thread_counter.clone(), self.thread_count_max.clone())
+            spawn_in_pool(self.name.clone(),
+                          self.jobs.clone(),
+                          self.thread_counter.clone(),
+                          self.thread_count_max.clone())
         }
     }
 }
@@ -92,6 +98,7 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
+    name: Option<String>,
     jobs: Sender<Thunk<'static>>,
     job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
     active_count: Arc<AtomicUsize>,
@@ -105,6 +112,15 @@ impl ThreadPool {
     ///
     /// This function will panic if `threads` is 0.
     pub fn new(threads: usize) -> ThreadPool {
+        ThreadPool::new_pool(None, threads)
+    }
+
+    pub fn new_with_name(name: String, threads: usize) -> ThreadPool {
+        ThreadPool::new_pool(Some(name), threads)
+    }
+
+    #[inline]
+    fn new_pool(name: Option<String>, threads: usize) -> ThreadPool {
         assert!(threads >= 1);
 
         let (tx, rx) = channel::<Thunk<'static>>();
@@ -114,10 +130,14 @@ impl ThreadPool {
 
         // Threadpool threads
         for _ in 0..threads {
-            spawn_in_pool(rx.clone(), active_count.clone(), max_count.clone());
+            spawn_in_pool(name.clone(),
+                          rx.clone(),
+                          active_count.clone(),
+                          max_count.clone());
         }
 
         ThreadPool {
+            name: name,
             jobs: tx,
             job_receiver: rx.clone(),
             active_count: active_count,
@@ -151,18 +171,26 @@ impl ThreadPool {
         if threads > current_max {
             // Spawn new threads
             for _ in 0..(threads - current_max) {
-                spawn_in_pool(self.job_receiver.clone(), self.active_count.clone(), self.max_count.clone());
+                spawn_in_pool(self.name.clone(),
+                              self.job_receiver.clone(),
+                              self.active_count.clone(),
+                              self.max_count.clone());
             }
         }
     }
 }
 
-fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
+fn spawn_in_pool(name: Option<String>,
+                 jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
                  thread_counter: Arc<AtomicUsize>,
                  thread_count_max: Arc<AtomicUsize>) {
-    thread::spawn(move || {
+    let mut builder = Builder::new();
+    if let Some(ref name) = name {
+        builder = builder.name(name.clone());
+    }
+    builder.spawn(move || {
         // Will spawn a new thread on panic unless it is cancelled.
-        let sentinel = Sentinel::new(&jobs, &thread_counter, &thread_count_max);
+        let sentinel = Sentinel::new(name, &jobs, &thread_counter, &thread_count_max);
 
         loop {
             // Shutdown this thread if the pool has become smaller
@@ -200,9 +228,9 @@ fn spawn_in_pool(jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
 mod test {
     #![allow(deprecated)]
     use super::ThreadPool;
-    use std::sync::mpsc::channel;
+    use std::sync::mpsc::{sync_channel, channel};
     use std::sync::{Arc, Barrier};
-    use std::thread::sleep_ms;
+    use std::thread::{self, sleep_ms};
 
     const TEST_TASKS: usize = 4;
 
@@ -403,5 +431,41 @@ mod test {
         b2.wait();
         assert_eq!(pool.active_count(), TEST_TASKS);
         b3.wait();
+    }
+
+    #[test]
+    fn test_name() {
+        let name = "test";
+        let mut pool = ThreadPool::new_with_name(name.to_owned(), 2);
+        let (tx, rx) = sync_channel(0);
+
+        // initial thread should share the name "test"
+        for _ in 0..2 {
+            let tx = tx.clone();
+            pool.execute(move || {
+                let name = thread::current().name().unwrap().to_owned();
+                tx.send(name).unwrap();
+                panic!();
+            });
+        }
+
+        // new spawn thread should share the name "test" too.
+        pool.set_threads(3);
+        let tx_clone = tx.clone();
+        pool.execute(move || {
+            let name = thread::current().name().unwrap().to_owned();
+            tx_clone.send(name).unwrap();
+            panic!();
+        });
+
+        // recover thread should share the name "test" too.
+        pool.execute(move || {
+            let name = thread::current().name().unwrap().to_owned();
+            tx.send(name).unwrap();
+        });
+
+        for thread_name in rx.iter().take(4) {
+            assert_eq!(name, thread_name);
+        }
     }
 }
