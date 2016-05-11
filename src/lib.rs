@@ -115,7 +115,7 @@ impl ThreadPool {
         ThreadPool::new_pool(None, threads)
     }
 
-    /// Spawns a new thread pool with `threads` threads. Each thread will have the name `name`.
+    /// Spawns a new thread pool with `threads` threads. Each thread will have the [name][thread name] `name`.
     ///
     /// # Panics
     ///
@@ -143,6 +143,8 @@ impl ThreadPool {
     ///     assert_eq!("worker", thread_name);
     /// }
     /// ```
+    ///
+    /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
     pub fn new_with_name(name: String, threads: usize) -> ThreadPool {
         ThreadPool::new_pool(Some(name), threads)
     }
