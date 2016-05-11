@@ -1,5 +1,9 @@
 # Changes
 
+## 1.1.0
+
+* [New constructor for specifying thread names for a thread pool](https://github.com/frewsxcv/rust-threadpool/pull/28)
+
 ## 1.0.2
 
 * [Use atomic counters](https://github.com/frewsxcv/rust-threadpool/pull/25)

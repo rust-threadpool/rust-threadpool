@@ -115,6 +115,34 @@ impl ThreadPool {
         ThreadPool::new_pool(None, threads)
     }
 
+    /// Spawns a new thread pool with `threads` threads. Each thread will have the name `name`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `threads` is 0.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::sync::mpsc::sync_channel;
+    /// use std::thread;
+    /// use threadpool::ThreadPool;
+    ///
+    /// let (tx, rx) = sync_channel(0);
+    /// let mut pool = ThreadPool::new_with_name("worker".into(), 2);
+    /// for _ in 0..2 {
+    ///     let tx = tx.clone();
+    ///     pool.execute(move || {
+    ///         let name = thread::current().name().unwrap().to_owned();
+    ///         tx.send(name).unwrap();
+    ///         panic!()
+    ///     });
+    /// }
+    ///
+    /// for thread_name in rx.iter().take(2) {
+    ///     assert_eq!("worker", thread_name);
+    /// }
+    /// ```
     pub fn new_with_name(name: String, threads: usize) -> ThreadPool {
         ThreadPool::new_pool(Some(name), threads)
     }
@@ -445,7 +473,6 @@ mod test {
             pool.execute(move || {
                 let name = thread::current().name().unwrap().to_owned();
                 tx.send(name).unwrap();
-                panic!();
             });
         }
 
