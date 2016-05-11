@@ -135,7 +135,6 @@ impl ThreadPool {
     ///     pool.execute(move || {
     ///         let name = thread::current().name().unwrap().to_owned();
     ///         tx.send(name).unwrap();
-    ///         panic!()
     ///     });
     /// }
     ///
