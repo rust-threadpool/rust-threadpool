@@ -32,20 +32,21 @@ struct Sentinel<'a> {
     jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
     thread_counter: &'a Arc<AtomicUsize>,
     thread_count_max: &'a Arc<AtomicUsize>,
-    active: bool
+    active: bool,
 }
 
 impl<'a> Sentinel<'a> {
     fn new(name: Option<String>,
            jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
            thread_counter: &'a Arc<AtomicUsize>,
-           thread_count_max: &'a Arc<AtomicUsize>) -> Sentinel<'a> {
+           thread_count_max: &'a Arc<AtomicUsize>)
+           -> Sentinel<'a> {
         Sentinel {
             name: name,
             jobs: jobs,
             thread_counter: thread_counter,
             thread_count_max: thread_count_max,
-            active: true
+            active: true,
         }
     }
 
@@ -115,7 +116,8 @@ impl ThreadPool {
         ThreadPool::new_pool(None, threads)
     }
 
-    /// Spawns a new thread pool with `threads` threads. Each thread will have the name `name`.
+    /// Spawns a new thread pool with `threads` threads. Each thread will have the
+    /// [name][thread name] `name`.
     ///
     /// # Panics
     ///
@@ -135,7 +137,6 @@ impl ThreadPool {
     ///     pool.execute(move || {
     ///         let name = thread::current().name().unwrap().to_owned();
     ///         tx.send(name).unwrap();
-    ///         panic!()
     ///     });
     /// }
     ///
@@ -143,6 +144,8 @@ impl ThreadPool {
     ///     assert_eq!("worker", thread_name);
     /// }
     /// ```
+    ///
+    /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
     pub fn new_with_name(name: String, threads: usize) -> ThreadPool {
         ThreadPool::new_pool(Some(name), threads)
     }
@@ -169,13 +172,13 @@ impl ThreadPool {
             jobs: tx,
             job_receiver: rx.clone(),
             active_count: active_count,
-            max_count: max_count
+            max_count: max_count,
         }
     }
 
     /// Executes the function `job` on a thread in the pool.
     pub fn execute<F>(&self, job: F)
-        where F : FnOnce() + Send + 'static
+        where F: FnOnce() + Send + 'static
     {
         self.jobs.send(Box::new(move || job())).unwrap();
     }
@@ -217,39 +220,40 @@ fn spawn_in_pool(name: Option<String>,
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
-        // Will spawn a new thread on panic unless it is cancelled.
-        let sentinel = Sentinel::new(name, &jobs, &thread_counter, &thread_count_max);
+               // Will spawn a new thread on panic unless it is cancelled.
+               let sentinel = Sentinel::new(name, &jobs, &thread_counter, &thread_count_max);
 
-        loop {
-            // Shutdown this thread if the pool has become smaller
-            let thread_counter_val = thread_counter.load(Ordering::Acquire);
-            let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
-            if thread_counter_val < thread_count_max_val {
-                let message = {
-                    // Only lock jobs for the time it takes
-                    // to get a job, not run it.
-                    let lock = jobs.lock().unwrap();
-                    lock.recv()
-                };
+               loop {
+                   // Shutdown this thread if the pool has become smaller
+                   let thread_counter_val = thread_counter.load(Ordering::Acquire);
+                   let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
+                   if thread_counter_val < thread_count_max_val {
+                       let message = {
+                           // Only lock jobs for the time it takes
+                           // to get a job, not run it.
+                           let lock = jobs.lock().unwrap();
+                           lock.recv()
+                       };
 
-                match message {
-                    Ok(job) => {
-                        // Do not allow IR around the job execution
-                        thread_counter.fetch_add(1, Ordering::SeqCst);
-                        job.call_box();
-                        thread_counter.fetch_sub(1, Ordering::SeqCst);
-                    },
+                       match message {
+                           Ok(job) => {
+                               // Do not allow IR around the job execution
+                               thread_counter.fetch_add(1, Ordering::SeqCst);
+                               job.call_box();
+                               thread_counter.fetch_sub(1, Ordering::SeqCst);
+                           }
 
-                    // The ThreadPool was dropped.
-                    Err(..) => break
-                }
-            } else {
-                break;
-            }
-        }
+                           // The ThreadPool was dropped.
+                           Err(..) => break,
+                       }
+                   } else {
+                       break;
+                   }
+               }
 
-        sentinel.cancel();
-    });
+               sentinel.cancel();
+           })
+           .unwrap();
 }
 
 #[cfg(test)]
@@ -310,7 +314,7 @@ mod test {
     fn test_active_count() {
         let pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
-            pool.execute(move|| {
+            pool.execute(move || {
                 loop {
                     sleep_ms(10000);
                 }
@@ -330,7 +334,7 @@ mod test {
         let (tx, rx) = channel();
         for _ in 0..TEST_TASKS {
             let tx = tx.clone();
-            pool.execute(move|| {
+            pool.execute(move || {
                 tx.send(1).unwrap();
             });
         }
@@ -350,14 +354,14 @@ mod test {
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
-            pool.execute(move|| -> () { panic!() });
+            pool.execute(move || -> () { panic!() });
         }
 
         // Ensure new threads were spawned to compensate.
         let (tx, rx) = channel();
         for _ in 0..TEST_TASKS {
             let tx = tx.clone();
-            pool.execute(move|| {
+            pool.execute(move || {
                 tx.send(1).unwrap();
             });
         }
@@ -374,7 +378,7 @@ mod test {
         // Panic all the existing threads in a bit.
         for _ in 0..TEST_TASKS {
             let waiter = waiter.clone();
-            pool.execute(move|| {
+            pool.execute(move || {
                 waiter.wait();
                 panic!("Ignore this panic, it should!");
             });
@@ -389,73 +393,74 @@ mod test {
     #[test]
     fn test_massive_task_creation() {
         let test_tasks = 4_200_000;
-        
+
         let pool = ThreadPool::new(TEST_TASKS);
-        let b0 = Arc::new(Barrier::new(TEST_TASKS +1));
-        let b1 = Arc::new(Barrier::new(TEST_TASKS +1));
+        let b0 = Arc::new(Barrier::new(TEST_TASKS + 1));
+        let b1 = Arc::new(Barrier::new(TEST_TASKS + 1));
 
         let (tx, rx) = channel();
-        
+
         for i in 0..test_tasks {
             let tx = tx.clone();
             let (b0, b1) = (b0.clone(), b1.clone());
-            
-            pool.execute(move|| {
-                
+
+            pool.execute(move || {
+
                 // Wait until the pool has been filled once.
                 if i < TEST_TASKS {
                     b0.wait();
                     // wait so the pool can be measured
                     b1.wait();
                 }
-                
+
                 tx.send(1).is_ok();
             });
         }
-        
+
         b0.wait();
         assert_eq!(pool.active_count(), TEST_TASKS);
         b1.wait();
 
         assert_eq!(rx.iter().take(test_tasks).fold(0, |a, b| a + b), test_tasks);
-        // `iter().take(test_tasks).fold` may be faster than the last thread finishing itself, so values of 0 or 1 are ok.
+        // `iter().take(test_tasks).fold` may be faster than the last thread finishing itself, so
+        // values of 0 or 1 are ok.
         assert!(pool.active_count() <= 1);
     }
-    
+
     #[test]
     fn test_shrink() {
         let test_tasks_begin = TEST_TASKS + 2;
-        
+
         let mut pool = ThreadPool::new(test_tasks_begin);
-        let b0 = Arc::new(Barrier::new(test_tasks_begin +1));
-        let b1 = Arc::new(Barrier::new(test_tasks_begin +1));
-        
+        let b0 = Arc::new(Barrier::new(test_tasks_begin + 1));
+        let b1 = Arc::new(Barrier::new(test_tasks_begin + 1));
+
         for _ in 0..test_tasks_begin {
             let (b0, b1) = (b0.clone(), b1.clone());
-            pool.execute(move|| {
+            pool.execute(move || {
                 b0.wait();
                 b1.wait();
             });
         }
-        
-        let b2 = Arc::new(Barrier::new(TEST_TASKS +1));
-        let b3 = Arc::new(Barrier::new(TEST_TASKS +1));
-        
+
+        let b2 = Arc::new(Barrier::new(TEST_TASKS + 1));
+        let b3 = Arc::new(Barrier::new(TEST_TASKS + 1));
+
         for _ in 0..TEST_TASKS {
             let (b2, b3) = (b2.clone(), b3.clone());
-            pool.execute(move|| {
+            pool.execute(move || {
                 b2.wait();
                 b3.wait();
             });
         }
-        
+
         b0.wait();
         pool.set_threads(TEST_TASKS);
-        
+
         assert_eq!(pool.active_count(), test_tasks_begin);
         b1.wait();
-        
-        
+
+
         b2.wait();
         assert_eq!(pool.active_count(), TEST_TASKS);
         b3.wait();
