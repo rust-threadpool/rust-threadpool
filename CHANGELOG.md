@@ -1,5 +1,10 @@
 # Changes
 
+## 1.1.1
+
+* [Silence warning related to unused result](https://github.com/frewsxcv/rust-threadpool/pull/30)
+* [Minor doc improvements](https://github.com/frewsxcv/rust-threadpool/pull/30)
+
 ## 1.1.0
 
 * [New constructor for specifying thread names for a thread pool](https://github.com/frewsxcv/rust-threadpool/pull/28)
