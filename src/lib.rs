@@ -251,7 +251,7 @@ fn spawn_in_pool(name: Option<String>,
         }
 
         sentinel.cancel();
-    });
+    }).unwrap();
 }
 
 #[cfg(test)]
