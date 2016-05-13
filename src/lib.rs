@@ -13,7 +13,7 @@
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::Builder;
+use std::thread::{Builder, panicking};
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -32,6 +32,7 @@ struct Sentinel<'a> {
     jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
     thread_counter: &'a Arc<AtomicUsize>,
     thread_count_max: &'a Arc<AtomicUsize>,
+    thread_count_panic: &'a Arc<AtomicUsize>,
     active: bool,
 }
 
@@ -39,13 +40,15 @@ impl<'a> Sentinel<'a> {
     fn new(name: Option<String>,
            jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
            thread_counter: &'a Arc<AtomicUsize>,
-           thread_count_max: &'a Arc<AtomicUsize>)
+           thread_count_max: &'a Arc<AtomicUsize>,
+           thread_count_panic: &'a Arc<AtomicUsize>)
            -> Sentinel<'a> {
         Sentinel {
             name: name,
             jobs: jobs,
             thread_counter: thread_counter,
             thread_count_max: thread_count_max,
+            thread_count_panic: thread_count_panic,
             active: true,
         }
     }
@@ -60,10 +63,14 @@ impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
             self.thread_counter.fetch_sub(1, Ordering::SeqCst);
+            if panicking() {
+                self.thread_count_panic.fetch_add(1, Ordering::SeqCst);
+            }
             spawn_in_pool(self.name.clone(),
                           self.jobs.clone(),
                           self.thread_counter.clone(),
-                          self.thread_count_max.clone())
+                          self.thread_count_max.clone(),
+                          self.thread_count_panic.clone())
         }
     }
 }
@@ -104,6 +111,7 @@ pub struct ThreadPool {
     job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
     active_count: Arc<AtomicUsize>,
     max_count: Arc<AtomicUsize>,
+    panic_count: Arc<AtomicUsize>,
 }
 
 impl ThreadPool {
@@ -158,13 +166,15 @@ impl ThreadPool {
         let rx = Arc::new(Mutex::new(rx));
         let active_count = Arc::new(AtomicUsize::new(0));
         let max_count = Arc::new(AtomicUsize::new(threads));
+        let panic_count = Arc::new(AtomicUsize::new(0));
 
         // Threadpool threads
         for _ in 0..threads {
             spawn_in_pool(name.clone(),
                           rx.clone(),
                           active_count.clone(),
-                          max_count.clone());
+                          max_count.clone(),
+                          panic_count.clone());
         }
 
         ThreadPool {
@@ -173,6 +183,7 @@ impl ThreadPool {
             job_receiver: rx.clone(),
             active_count: active_count,
             max_count: max_count,
+            panic_count: panic_count,
         }
     }
 
@@ -193,6 +204,11 @@ impl ThreadPool {
         self.max_count.load(Ordering::Relaxed)
     }
 
+    /// Returns the number of panicked threads over the lifetime of the pool.
+    pub fn panic_count(&self) -> usize {
+        self.panic_count.load(Ordering::Relaxed)
+    }
+
     /// Sets the number of threads to use as `threads`.
     /// Can be used to change the threadpool size during runtime.
     /// Will not abort already running or waiting threads.
@@ -205,7 +221,8 @@ impl ThreadPool {
                 spawn_in_pool(self.name.clone(),
                               self.job_receiver.clone(),
                               self.active_count.clone(),
-                              self.max_count.clone());
+                              self.max_count.clone(),
+                              self.panic_count.clone());
             }
         }
     }
@@ -214,14 +231,16 @@ impl ThreadPool {
 fn spawn_in_pool(name: Option<String>,
                  jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
                  thread_counter: Arc<AtomicUsize>,
-                 thread_count_max: Arc<AtomicUsize>) {
+                 thread_count_max: Arc<AtomicUsize>,
+                 thread_count_panic: Arc<AtomicUsize>) {
     let mut builder = Builder::new();
     if let Some(ref name) = name {
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
                // Will spawn a new thread on panic unless it is cancelled.
-               let sentinel = Sentinel::new(name, &jobs, &thread_counter, &thread_count_max);
+               let sentinel = Sentinel::new(
+                   name, &jobs, &thread_counter, &thread_count_max, &thread_count_panic);
 
                loop {
                    // Shutdown this thread if the pool has become smaller
@@ -356,6 +375,9 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || -> () { panic!() });
         }
+        sleep_ms(1024);
+
+        assert_eq!(pool.panic_count(), TEST_TASKS);
 
         // Ensure new threads were spawned to compensate.
         let (tx, rx) = channel();
