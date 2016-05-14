@@ -1,5 +1,9 @@
 # Changes
 
+## 1.2.0
+
+* [New method to determine number of panicked threads](https://github.com/frewsxcv/rust-threadpool/pull/31)
+
 ## 1.1.1
 
 * [Silence warning related to unused result](https://github.com/frewsxcv/rust-threadpool/pull/30)
