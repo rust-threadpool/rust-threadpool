@@ -1,6 +1,6 @@
 language: rust
 rust:
-  - 1.0.0
+  - 1.4.0
   - beta
   - nightly
 before_script:

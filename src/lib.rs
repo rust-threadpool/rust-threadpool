@@ -277,11 +277,11 @@ fn spawn_in_pool(name: Option<String>,
 
 #[cfg(test)]
 mod test {
-    #![allow(deprecated)]
     use super::ThreadPool;
     use std::sync::mpsc::{sync_channel, channel};
     use std::sync::{Arc, Barrier};
-    use std::thread::{self, sleep_ms};
+    use std::thread::{self, sleep};
+    use std::time::Duration;
 
     const TEST_TASKS: usize = 4;
 
@@ -292,7 +292,7 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
@@ -300,11 +300,11 @@ mod test {
         for _ in 0..(new_thread_amount - TEST_TASKS) {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
     }
 
@@ -321,11 +321,11 @@ mod test {
         for _ in 0..new_thread_amount {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
     }
 
@@ -335,11 +335,11 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000);
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         let active_count = pool.active_count();
         assert_eq!(active_count, TEST_TASKS);
         let initialized_count = pool.max_count();
@@ -375,7 +375,7 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || -> () { panic!() });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
 
         assert_eq!(pool.panic_count(), TEST_TASKS);
 
