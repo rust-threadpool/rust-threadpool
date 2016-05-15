@@ -238,41 +238,44 @@ fn spawn_in_pool(name: Option<String>,
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
-               // Will spawn a new thread on panic unless it is cancelled.
-               let sentinel = Sentinel::new(
-                   name, &jobs, &thread_counter, &thread_count_max, &thread_count_panic);
+            // Will spawn a new thread on panic unless it is cancelled.
+            let sentinel = Sentinel::new(name,
+                                         &jobs,
+                                         &thread_counter,
+                                         &thread_count_max,
+                                         &thread_count_panic);
 
-               loop {
-                   // Shutdown this thread if the pool has become smaller
-                   let thread_counter_val = thread_counter.load(Ordering::Acquire);
-                   let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
-                   if thread_counter_val < thread_count_max_val {
-                       let message = {
-                           // Only lock jobs for the time it takes
-                           // to get a job, not run it.
-                           let lock = jobs.lock().unwrap();
-                           lock.recv()
-                       };
+            loop {
+                // Shutdown this thread if the pool has become smaller
+                let thread_counter_val = thread_counter.load(Ordering::Acquire);
+                let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
+                if thread_counter_val < thread_count_max_val {
+                    let message = {
+                        // Only lock jobs for the time it takes
+                        // to get a job, not run it.
+                        let lock = jobs.lock().unwrap();
+                        lock.recv()
+                    };
 
-                       match message {
-                           Ok(job) => {
-                               // Do not allow IR around the job execution
-                               thread_counter.fetch_add(1, Ordering::SeqCst);
-                               job.call_box();
-                               thread_counter.fetch_sub(1, Ordering::SeqCst);
-                           }
+                    match message {
+                        Ok(job) => {
+                            // Do not allow IR around the job execution
+                            thread_counter.fetch_add(1, Ordering::SeqCst);
+                            job.call_box();
+                            thread_counter.fetch_sub(1, Ordering::SeqCst);
+                        }
 
-                           // The ThreadPool was dropped.
-                           Err(..) => break,
-                       }
-                   } else {
-                       break;
-                   }
-               }
+                        // The ThreadPool was dropped.
+                        Err(..) => break,
+                    }
+                } else {
+                    break;
+                }
+            }
 
-               sentinel.cancel();
-           })
-           .unwrap();
+            sentinel.cancel();
+        })
+        .unwrap();
 }
 
 #[cfg(test)]
