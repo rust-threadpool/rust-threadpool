@@ -238,50 +238,53 @@ fn spawn_in_pool(name: Option<String>,
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
-               // Will spawn a new thread on panic unless it is cancelled.
-               let sentinel = Sentinel::new(
-                   name, &jobs, &thread_counter, &thread_count_max, &thread_count_panic);
+            // Will spawn a new thread on panic unless it is cancelled.
+            let sentinel = Sentinel::new(name,
+                                         &jobs,
+                                         &thread_counter,
+                                         &thread_count_max,
+                                         &thread_count_panic);
 
-               loop {
-                   // Shutdown this thread if the pool has become smaller
-                   let thread_counter_val = thread_counter.load(Ordering::Acquire);
-                   let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
-                   if thread_counter_val < thread_count_max_val {
-                       let message = {
-                           // Only lock jobs for the time it takes
-                           // to get a job, not run it.
-                           let lock = jobs.lock().unwrap();
-                           lock.recv()
-                       };
+            loop {
+                // Shutdown this thread if the pool has become smaller
+                let thread_counter_val = thread_counter.load(Ordering::Acquire);
+                let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
+                if thread_counter_val < thread_count_max_val {
+                    let message = {
+                        // Only lock jobs for the time it takes
+                        // to get a job, not run it.
+                        let lock = jobs.lock().unwrap();
+                        lock.recv()
+                    };
 
-                       match message {
-                           Ok(job) => {
-                               // Do not allow IR around the job execution
-                               thread_counter.fetch_add(1, Ordering::SeqCst);
-                               job.call_box();
-                               thread_counter.fetch_sub(1, Ordering::SeqCst);
-                           }
+                    match message {
+                        Ok(job) => {
+                            // Do not allow IR around the job execution
+                            thread_counter.fetch_add(1, Ordering::SeqCst);
+                            job.call_box();
+                            thread_counter.fetch_sub(1, Ordering::SeqCst);
+                        }
 
-                           // The ThreadPool was dropped.
-                           Err(..) => break,
-                       }
-                   } else {
-                       break;
-                   }
-               }
+                        // The ThreadPool was dropped.
+                        Err(..) => break,
+                    }
+                } else {
+                    break;
+                }
+            }
 
-               sentinel.cancel();
-           })
-           .unwrap();
+            sentinel.cancel();
+        })
+        .unwrap();
 }
 
 #[cfg(test)]
 mod test {
-    #![allow(deprecated)]
     use super::ThreadPool;
     use std::sync::mpsc::{sync_channel, channel};
     use std::sync::{Arc, Barrier};
-    use std::thread::{self, sleep_ms};
+    use std::thread::{self, sleep};
+    use std::time::Duration;
 
     const TEST_TASKS: usize = 4;
 
@@ -292,7 +295,7 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
@@ -300,11 +303,11 @@ mod test {
         for _ in 0..(new_thread_amount - TEST_TASKS) {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
     }
 
@@ -321,11 +324,11 @@ mod test {
         for _ in 0..new_thread_amount {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000)
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
     }
 
@@ -335,11 +338,11 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
                 loop {
-                    sleep_ms(10000);
+                    sleep(Duration::from_secs(10))
                 }
             });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
         let active_count = pool.active_count();
         assert_eq!(active_count, TEST_TASKS);
         let initialized_count = pool.max_count();
@@ -375,7 +378,7 @@ mod test {
         for _ in 0..TEST_TASKS {
             pool.execute(move || -> () { panic!() });
         }
-        sleep_ms(1024);
+        sleep(Duration::from_secs(1));
 
         assert_eq!(pool.panic_count(), TEST_TASKS);
 
