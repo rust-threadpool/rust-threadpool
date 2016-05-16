@@ -115,21 +115,21 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    /// Spawns a new thread pool with `threads` threads.
+    /// Spawns a new thread pool with `num_threads` threads.
     ///
     /// # Panics
     ///
-    /// This function will panic if `threads` is 0.
-    pub fn new(threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(None, threads)
+    /// This function will panic if `num_threads` is 0.
+    pub fn new(num_threads: usize) -> ThreadPool {
+        ThreadPool::new_pool(None, num_threads)
     }
 
-    /// Spawns a new thread pool with `threads` threads. Each thread will have the
+    /// Spawns a new thread pool with `num_threads` threads. Each thread will have the
     /// [name][thread name] `name`.
     ///
     /// # Panics
     ///
-    /// This function will panic if `threads` is 0.
+    /// This function will panic if `num_threads` is 0.
     ///
     /// # Example
     ///
@@ -154,22 +154,22 @@ impl ThreadPool {
     /// ```
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
-    pub fn new_with_name(name: String, threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(Some(name), threads)
+    pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
+        ThreadPool::new_pool(Some(name), num_threads)
     }
 
     #[inline]
-    fn new_pool(name: Option<String>, threads: usize) -> ThreadPool {
-        assert!(threads >= 1);
+    fn new_pool(name: Option<String>, num_threads: usize) -> ThreadPool {
+        assert!(num_threads >= 1);
 
         let (tx, rx) = channel::<Thunk<'static>>();
         let rx = Arc::new(Mutex::new(rx));
         let active_count = Arc::new(AtomicUsize::new(0));
-        let max_count = Arc::new(AtomicUsize::new(threads));
+        let max_count = Arc::new(AtomicUsize::new(num_threads));
         let panic_count = Arc::new(AtomicUsize::new(0));
 
         // Threadpool threads
-        for _ in 0..threads {
+        for _ in 0..num_threads {
             spawn_in_pool(name.clone(),
                           rx.clone(),
                           active_count.clone(),
@@ -209,15 +209,22 @@ impl ThreadPool {
         self.panic_count.load(Ordering::Relaxed)
     }
 
-    /// Sets the number of threads to use as `threads`.
+    /// **Deprecated: Use `ThreadPool::set_num_threads`**
+    // #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
+    // TODO: #[deprecated] isn't stable yet.
+    pub fn set_threads(&mut self, num_threads: usize) {
+        self.set_num_threads(num_threads)
+    }
+
+    /// Sets the number of worker-threads to use as `num_threads`.
     /// Can be used to change the threadpool size during runtime.
     /// Will not abort already running or waiting threads.
-    pub fn set_threads(&mut self, threads: usize) {
-        assert!(threads >= 1);
-        let current_max = (*self.max_count).swap(threads, Ordering::Release);
-        if threads > current_max {
+    pub fn set_num_threads(&mut self, num_threads: usize) {
+        assert!(num_threads >= 1);
+        let current_max = (*self.max_count).swap(num_threads, Ordering::Release);
+        if num_threads > current_max {
             // Spawn new threads
-            for _ in 0..(threads - current_max) {
+            for _ in 0..(num_threads - current_max) {
                 spawn_in_pool(self.name.clone(),
                               self.job_receiver.clone(),
                               self.active_count.clone(),
@@ -289,7 +296,7 @@ mod test {
     const TEST_TASKS: usize = 4;
 
     #[test]
-    fn test_set_threads_increasing() {
+    fn test_set_num_threads_increasing() {
         let new_thread_amount = TEST_TASKS + 8;
         let mut pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
@@ -299,7 +306,7 @@ mod test {
                 }
             });
         }
-        pool.set_threads(new_thread_amount);
+        pool.set_num_threads(new_thread_amount);
         for _ in 0..(new_thread_amount - TEST_TASKS) {
             pool.execute(move || {
                 loop {
@@ -312,7 +319,7 @@ mod test {
     }
 
     #[test]
-    fn test_set_threads_decreasing() {
+    fn test_set_num_threads_decreasing() {
         let new_thread_amount = 2;
         let mut pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
@@ -320,7 +327,7 @@ mod test {
                 1 + 1;
             });
         }
-        pool.set_threads(new_thread_amount);
+        pool.set_num_threads(new_thread_amount);
         for _ in 0..new_thread_amount {
             pool.execute(move || {
                 loop {
@@ -480,7 +487,7 @@ mod test {
         }
 
         b0.wait();
-        pool.set_threads(TEST_TASKS);
+        pool.set_num_threads(TEST_TASKS);
 
         assert_eq!(pool.active_count(), test_tasks_begin);
         b1.wait();
@@ -507,7 +514,7 @@ mod test {
         }
 
         // new spawn thread should share the name "test" too.
-        pool.set_threads(3);
+        pool.set_num_threads(3);
         let tx_clone = tx.clone();
         pool.execute(move || {
             let name = thread::current().name().unwrap().to_owned();
