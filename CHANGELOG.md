@@ -1,5 +1,11 @@
 # Changes
 
+## 1.3.0
+
+* [Add barrier sync example](https://github.com/frewsxcv/rust-threadpool/pull/35)
+* [Rename `threads` method/params to `num_threads`, deprecate old usage](https://github.com/frewsxcv/rust-threadpool/pull/34)
+* [Stop using deprecated `sleep_ms` function in tests](https://github.com/frewsxcv/rust-threadpool/pull/33)
+
 ## 1.2.0
 
 * [New method to determine number of panicked threads](https://github.com/frewsxcv/rust-threadpool/pull/31)
