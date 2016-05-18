@@ -80,7 +80,11 @@ impl<'a> Drop for Sentinel<'a> {
 /// Spawns `n` worker threads and replenishes the pool if any worker threads
 /// panic.
 ///
-/// # Example
+/// # Examples
+///
+/// ## Syncronized with a channel
+///
+/// Every thread sends one message over the channel, which then is collected with the `take()`.
 ///
 /// ```
 /// use threadpool::ThreadPool;
@@ -99,6 +103,42 @@ impl<'a> Drop for Sentinel<'a> {
 /// }
 ///
 /// assert_eq!(rx.iter().take(n_jobs).fold(0, |a, b| a + b), 28);
+/// ```
+///
+/// ## Syncronized with a barrier
+///
+/// Keep in mind, if you put more jobs in the pool than you have workers,
+/// you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock) which is [not considered unsafe](http://doc.rust-lang.org/reference.html#behavior-not-considered-unsafe).
+///
+/// ```
+/// use threadpool::ThreadPool;
+/// use std::sync::{Arc, Barrier};
+/// use std::sync::atomic::{AtomicUsize, Ordering};
+///
+/// // create at least as many workers as jobs or you will deadlock yourself
+/// let n_workers = 42;
+/// let n_jobs = 23;
+/// let pool = ThreadPool::new(n_workers);
+/// let an_atomic = Arc::new(AtomicUsize::new(0));
+///
+/// // create a barrier that wait all jobs plus the starter thread
+/// let barrier = Arc::new(Barrier::new(n_jobs + 1));
+/// for i in 0..n_jobs {
+///   let barrier = barrier.clone();
+///   let an_atomic = an_atomic.clone();
+///
+///   pool.execute(move|| {
+///     // do the heavy work
+///     an_atomic.fetch_add(1, Ordering::Relaxed);
+///
+///     // then wait for the other threads
+///     barrier.wait();
+///   });
+/// }
+///
+/// // wait for the threads to finish the work
+/// barrier.wait();
+/// assert_eq!(an_atomic.load(Ordering::SeqCst), 23);
 /// ```
 #[derive(Clone)]
 pub struct ThreadPool {

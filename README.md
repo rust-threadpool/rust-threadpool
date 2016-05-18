@@ -26,6 +26,7 @@ extern crate threadpool;
 
 * [rust-scoped-pool](http://github.com/reem/rust-scoped-pool)
 * [scoped-threadpool-rs](https://github.com/Kimundi/scoped-threadpool-rs)
+* [crossbeam](https://github.com/aturon/crossbeam)
 
 ## License
 
