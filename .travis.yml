@@ -1,6 +1,8 @@
+sudo: false
 language: rust
+cache: cargo
 rust:
-  - 1.4.0
+  - 1.9.0
   - beta
   - nightly
 before_script:
