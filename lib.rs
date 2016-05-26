@@ -289,8 +289,7 @@ impl ThreadPool {
     }
 
     /// **Deprecated: Use `ThreadPool::set_num_threads`**
-    // #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
-    // TODO: #[deprecated] isn't stable yet.
+    #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
     pub fn set_threads(&mut self, num_threads: usize) {
         self.set_num_threads(num_threads)
     }
