@@ -98,11 +98,11 @@ impl<'a> Drop for Sentinel<'a> {
 /// for i in 0..n_jobs {
 ///     let tx = tx.clone();
 ///     pool.execute(move|| {
-///         tx.send(i).unwrap();
+///         tx.send(1).unwrap();
 ///     });
 /// }
 ///
-/// assert_eq!(rx.iter().take(n_jobs).fold(0, |a, b| a + b), 28);
+/// assert_eq!(rx.iter().take(n_jobs).fold(0, |a, b| a + b), 8);
 /// ```
 ///
 /// ## Syncronized with a barrier
