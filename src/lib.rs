@@ -108,7 +108,9 @@ impl<'a> Drop for Sentinel<'a> {
 /// ## Syncronized with a barrier
 ///
 /// Keep in mind, if you put more jobs in the pool than you have workers,
-/// you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock) which is [not considered unsafe](http://doc.rust-lang.org/reference.html#behavior-not-considered-unsafe).
+/// you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock)
+/// which is [not considered unsafe]
+/// (http://doc.rust-lang.org/reference.html#behavior-not-considered-unsafe).
 ///
 /// ```
 /// use threadpool::ThreadPool;
