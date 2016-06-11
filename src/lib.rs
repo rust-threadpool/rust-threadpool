@@ -263,10 +263,10 @@ impl ThreadPool {
     /// Will not abort already running or waiting threads.
     pub fn set_num_threads(&mut self, num_threads: usize) {
         assert!(num_threads >= 1);
-        let current_max = (*self.max_count).swap(num_threads, Ordering::Release);
-        if num_threads > current_max {
+        let prev_num_threads = (*self.max_count).swap(num_threads, Ordering::Release);
+        if let Some(num_spawn) = num_threads.checked_sub(prev_num_threads) {
             // Spawn new threads
-            for _ in 0..(num_threads - current_max) {
+            for _ in 0..num_spawn {
                 spawn_in_pool(self.name.clone(),
                               self.job_receiver.clone(),
                               self.active_count.clone(),
