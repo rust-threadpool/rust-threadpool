@@ -261,6 +261,10 @@ impl ThreadPool {
     /// Sets the number of worker-threads to use as `num_threads`.
     /// Can be used to change the threadpool size during runtime.
     /// Will not abort already running or waiting threads.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `num_threads` is 0.
     pub fn set_num_threads(&mut self, num_threads: usize) {
         assert!(num_threads >= 1);
         let prev_num_threads = (*self.max_count).swap(num_threads, Ordering::Release);
