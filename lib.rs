@@ -247,6 +247,24 @@ impl ThreadPool {
     }
 
     /// Returns the number of panicked threads over the lifetime of the pool.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let num_threads = 10;
+    /// let pool = ThreadPool::new(num_threads);
+    /// for _ in 0..num_threads {
+    ///     pool.execute(move || {
+    ///         panic!()
+    ///     });
+    /// }
+    /// sleep(Duration::from_secs(1));
+    /// assert_eq!(pool.panic_count(), num_threads);
+    /// ```
     pub fn panic_count(&self) -> usize {
         self.panic_count.load(Ordering::Relaxed)
     }
