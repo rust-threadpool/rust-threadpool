@@ -447,7 +447,7 @@ mod test {
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
-            pool.execute(move || -> () { panic!() });
+            pool.execute(move || { panic!() });
         }
         sleep(Duration::from_secs(1));
 
