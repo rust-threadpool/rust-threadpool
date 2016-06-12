@@ -173,7 +173,7 @@ impl ThreadPool {
     ///
     /// This function will panic if `num_threads` is 0.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::sync::mpsc::sync_channel;
