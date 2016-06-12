@@ -173,7 +173,7 @@ impl ThreadPool {
     ///
     /// This function will panic if `num_threads` is 0.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::sync::mpsc::sync_channel;
@@ -247,6 +247,24 @@ impl ThreadPool {
     }
 
     /// Returns the number of panicked threads over the lifetime of the pool.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let num_threads = 10;
+    /// let pool = ThreadPool::new(num_threads);
+    /// for _ in 0..num_threads {
+    ///     pool.execute(move || {
+    ///         panic!()
+    ///     });
+    /// }
+    /// sleep(Duration::from_secs(1));
+    /// assert_eq!(pool.panic_count(), num_threads);
+    /// ```
     pub fn panic_count(&self) -> usize {
         self.panic_count.load(Ordering::Relaxed)
     }
@@ -429,7 +447,7 @@ mod test {
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
-            pool.execute(move || -> () { panic!() });
+            pool.execute(move || { panic!() });
         }
         sleep(Duration::from_secs(1));
 
