@@ -237,6 +237,24 @@ impl ThreadPool {
     }
 
     /// Returns the number of currently active threads.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let num_threads = 10;
+    /// let pool = ThreadPool::new(num_threads);
+    /// for _ in 0..num_threads {
+    ///     pool.execute(move || {
+    ///         sleep(Duration::from_secs(5));
+    ///     });
+    /// }
+    /// sleep(Duration::from_secs(1));
+    /// assert_eq!(pool.active_count(), num_threads);
+    /// ```
     pub fn active_count(&self) -> usize {
         self.active_count.load(Ordering::Relaxed)
     }
