@@ -338,28 +338,25 @@ fn spawn_in_pool(name: Option<String>,
                 // Shutdown this thread if the pool has become smaller
                 let thread_counter_val = thread_counter.load(Ordering::Acquire);
                 let thread_count_max_val = thread_count_max.load(Ordering::Relaxed);
-                if thread_counter_val < thread_count_max_val {
-                    let message = {
-                        // Only lock jobs for the time it takes
-                        // to get a job, not run it.
-                        let lock = jobs.lock().unwrap();
-                        lock.recv()
-                    };
-
-                    match message {
-                        Ok(job) => {
-                            // Do not allow IR around the job execution
-                            thread_counter.fetch_add(1, Ordering::SeqCst);
-                            job.call_box();
-                            thread_counter.fetch_sub(1, Ordering::SeqCst);
-                        }
-
-                        // The ThreadPool was dropped.
-                        Err(..) => break,
-                    }
-                } else {
+                if thread_counter_val >= thread_count_max_val {
                     break;
                 }
+                let message = {
+                    // Only lock jobs for the time it takes
+                    // to get a job, not run it.
+                    let lock = jobs.lock().unwrap();
+                    lock.recv()
+                };
+
+                let job = match message {
+                    Ok(job) => job,
+                    // The ThreadPool was dropped.
+                    Err(..) => break,
+                };
+                // Do not allow IR around the job execution
+                thread_counter.fetch_add(1, Ordering::SeqCst);
+                job.call_box();
+                thread_counter.fetch_sub(1, Ordering::SeqCst);
             }
 
             sentinel.cancel();
