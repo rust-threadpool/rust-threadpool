@@ -10,7 +10,7 @@
 
 //! A thread pool used to execute functions in parallel.
 //!
-//! Spawns `n` worker threads and replenishes the pool if any worker threads
+//! Spawns a specified number of worker threads and replenishes the pool if any worker threads
 //! panic.
 //!
 //! # Examples
