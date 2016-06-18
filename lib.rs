@@ -58,7 +58,7 @@
 //!
 //! // create a barrier that wait all jobs plus the starter thread
 //! let barrier = Arc::new(Barrier::new(n_jobs + 1));
-//! for i in 0..n_jobs {
+//! for _ in 0..n_jobs {
 //!     let barrier = barrier.clone();
 //!     let an_atomic = an_atomic.clone();
 //!
