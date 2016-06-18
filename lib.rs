@@ -59,16 +59,16 @@
 //! // create a barrier that wait all jobs plus the starter thread
 //! let barrier = Arc::new(Barrier::new(n_jobs + 1));
 //! for i in 0..n_jobs {
-//!   let barrier = barrier.clone();
-//!   let an_atomic = an_atomic.clone();
+//!     let barrier = barrier.clone();
+//!     let an_atomic = an_atomic.clone();
 //!
-//!   pool.execute(move|| {
-//!     // do the heavy work
-//!     an_atomic.fetch_add(1, Ordering::Relaxed);
+//!     pool.execute(move|| {
+//!         // do the heavy work
+//!         an_atomic.fetch_add(1, Ordering::Relaxed);
 //!
-//!     // then wait for the other threads
-//!     barrier.wait();
-//!   });
+//!         // then wait for the other threads
+//!         barrier.wait();
+//!     });
 //! }
 //!
 //! // wait for the threads to finish the work
