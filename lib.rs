@@ -76,6 +76,7 @@
 //! assert_eq!(an_atomic.load(Ordering::SeqCst), 23);
 //! ```
 
+use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -316,6 +317,18 @@ impl ThreadPool {
         }
     }
 }
+
+
+impl fmt::Debug for ThreadPool {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+               "ThreadPool {{ name: {:?}, active_count: {}, max_count: {} }}",
+               self.name,
+               self.active_count(),
+               self.max_count())
+    }
+}
+
 
 fn spawn_in_pool(name: Option<String>,
                  jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
@@ -610,5 +623,24 @@ mod test {
         for thread_name in rx.iter().take(4) {
             assert_eq!(name, thread_name);
         }
+    }
+
+    #[test]
+    fn test_debug() {
+        let pool = ThreadPool::new(4);
+        let debug = format!("{:?}", pool);
+        assert_eq!(debug, "ThreadPool { name: None, active_count: 0, max_count: 4 }");
+
+        let pool = ThreadPool::new_with_name("hello".into(), 4);
+        let debug = format!("{:?}", pool);
+        assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), active_count: 0, max_count: 4 }");
+
+        let pool = ThreadPool::new(4);
+        pool.execute(move || {
+            sleep(Duration::from_secs(5))
+        });
+        sleep(Duration::from_secs(1));
+        let debug = format!("{:?}", pool);
+        assert_eq!(debug, "ThreadPool { name: None, active_count: 1, max_count: 4 }");
     }
 }
