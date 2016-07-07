@@ -1,5 +1,9 @@
 # Changes
 
+## 1.3.1
+
+* [Implement std::fmt::Debug for ThreadPool](https://github.com/frewsxcv/rust-threadpool/pull/50)
+
 ## 1.3.0
 
 * [Add barrier sync example](https://github.com/frewsxcv/rust-threadpool/pull/35)
