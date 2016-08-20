@@ -289,8 +289,7 @@ impl ThreadPool {
     }
 
     /// **Deprecated: Use `ThreadPool::set_num_threads`**
-    // #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
-    // TODO: #[deprecated] isn't stable yet.
+    #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
     pub fn set_threads(&mut self, num_threads: usize) {
         self.set_num_threads(num_threads)
     }
@@ -548,7 +547,8 @@ mod test {
         assert_eq!(rx.iter().take(test_tasks).fold(0, |a, b| a + b), test_tasks);
         // `iter().take(test_tasks).fold` may be faster than the last thread finishing itself, so
         // values of 0 or 1 are ok.
-        assert!(pool.active_count() <= 1);
+        let atomic_active_count = pool.active_count();
+        assert!(atomic_active_count <= 1, "atomic_active_count: {}", atomic_active_count);
     }
 
     #[test]

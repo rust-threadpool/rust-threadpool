@@ -1,5 +1,9 @@
 # Changes
 
+## 1.3.2
+
+* [Enable `#[deprecated]` doc, requires rust 1.9](https://github.com/frewsxcv/rust-threadpool/pull/38)
+
 ## 1.3.1
 
 * [Implement std::fmt::Debug for ThreadPool](https://github.com/frewsxcv/rust-threadpool/pull/50)

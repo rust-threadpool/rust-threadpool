@@ -1,5 +1,4 @@
-threadpool
-==========
+# threadpool
 
 A thread pool for running a number of jobs on a fixed set of worker threads.
 
@@ -21,6 +20,10 @@ and this to your crate root:
 ```rust
 extern crate threadpool;
 ```
+
+## Minimal requirements
+
+This crate requires rust >= 1.9.0
 
 ## Similar libraries
 
