@@ -40,9 +40,9 @@
 //!
 //! ## Syncronized with a barrier
 //!
-//! Keep in mind, if you put more jobs in the pool than you have workers,
+//! Keep in mind, if a barrier synchronizes more jobs than you have workers in the pool,
 //! you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock)
-//! which is [not considered unsafe]
+//! at the barrier which is [not considered unsafe]
 //! (http://doc.rust-lang.org/reference.html#behavior-not-considered-unsafe).
 //!
 //! ```
@@ -55,6 +55,8 @@
 //! let n_jobs = 23;
 //! let pool = ThreadPool::new(n_workers);
 //! let an_atomic = Arc::new(AtomicUsize::new(0));
+//!
+//! assert!(n_jobs <= n_workers, "too many jobs, will deadlock");
 //!
 //! // create a barrier that wait all jobs plus the starter thread
 //! let barrier = Arc::new(Barrier::new(n_jobs + 1));
