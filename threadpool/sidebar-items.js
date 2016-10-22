@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ThreadPool","Abstraction of a thread pool for basic parallelism."]]});

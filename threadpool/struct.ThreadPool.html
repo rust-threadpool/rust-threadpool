@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `ThreadPool` struct in crate `threadpool`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, ThreadPool">
+
+    <title>threadpool::ThreadPool - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>threadpool</a></p><script>window.sidebarCurrent = {name: 'ThreadPool', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>threadpool</a>::<wbr><a class='struct' href=''>ThreadPool</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a id='src-94' class='srclink' href='../src/threadpool/lib.rs.html#149-160' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct ThreadPool { /* fields omitted */ }</pre><div class='docblock'><p>Abstraction of a thread pool for basic parallelism.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-40' class='srclink' href='../src/threadpool/lib.rs.html#162-320' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class='method'><span id='new.v' class='invisible'><code>fn <a href='#method.new' class='fnname'>new</a>(num_threads: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span></h4>
+<div class='docblock'><p>Spawns a new thread pool with <code>num_threads</code> threads.</p>
+
+<h1 id='panics' class='section-header'><a href='#panics'>Panics</a></h1>
+<p>This function will panic if <code>num_threads</code> is 0.</p>
+</div><h4 id='method.new_with_name' class='method'><span id='new_with_name.v' class='invisible'><code>fn <a href='#method.new_with_name' class='fnname'>new_with_name</a>(name: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, num_threads: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>) -&gt; <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span></h4>
+<div class='docblock'><p>Spawns a new thread pool with <code>num_threads</code> threads. Each thread will have the
+<a href="https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name">name</a> <code>name</code>.</p>
+
+<h1 id='panics-1' class='section-header'><a href='#panics-1'>Panics</a></h1>
+<p>This function will panic if <code>num_threads</code> is 0.</p>
+
+<h1 id='examples' class='section-header'><a href='#examples'>Examples</a></h1>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>sync</span>::<span class='ident'>mpsc</span>::<span class='ident'>sync_channel</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>thread</span>;
+<span class='kw'>use</span> <span class='ident'>threadpool</span>::<span class='ident'>ThreadPool</span>;
+
+<span class='kw'>let</span> (<span class='ident'>tx</span>, <span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>sync_channel</span>(<span class='number'>0</span>);
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>pool</span> <span class='op'>=</span> <span class='ident'>ThreadPool</span>::<span class='ident'>new_with_name</span>(<span class='string'>&quot;worker&quot;</span>.<span class='ident'>into</span>(), <span class='number'>2</span>);
+<span class='kw'>for</span> _ <span class='kw'>in</span> <span class='number'>0</span>..<span class='number'>2</span> {
+    <span class='kw'>let</span> <span class='ident'>tx</span> <span class='op'>=</span> <span class='ident'>tx</span>.<span class='ident'>clone</span>();
+    <span class='ident'>pool</span>.<span class='ident'>execute</span>(<span class='kw'>move</span> <span class='op'>||</span> {
+        <span class='kw'>let</span> <span class='ident'>name</span> <span class='op'>=</span> <span class='ident'>thread</span>::<span class='ident'>current</span>().<span class='ident'>name</span>().<span class='ident'>unwrap</span>().<span class='ident'>to_owned</span>();
+        <span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='ident'>name</span>).<span class='ident'>unwrap</span>();
+    });
+}
+
+<span class='kw'>for</span> <span class='ident'>thread_name</span> <span class='kw'>in</span> <span class='ident'>rx</span>.<span class='ident'>iter</span>().<span class='ident'>take</span>(<span class='number'>2</span>) {
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='string'>&quot;worker&quot;</span>, <span class='ident'>thread_name</span>);
+}</pre>
+</div><h4 id='method.execute' class='method'><span id='execute.v' class='invisible'><code>fn <a href='#method.execute' class='fnname'>execute</a>&lt;F&gt;(&amp;self, job: F) <span class='where'>where F: <a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>() + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></span></h4>
+<div class='docblock'><p>Executes the function <code>job</code> on a thread in the pool.</p>
+</div><h4 id='method.active_count' class='method'><span id='active_count.v' class='invisible'><code>fn <a href='#method.active_count' class='fnname'>active_count</a>(&amp;self) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a></code></span></h4>
+<div class='docblock'><p>Returns the number of currently active threads.</p>
+
+<h1 id='examples-1' class='section-header'><a href='#examples-1'>Examples</a></h1>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>threadpool</span>::<span class='ident'>ThreadPool</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>time</span>::<span class='ident'>Duration</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep</span>;
+
+<span class='kw'>let</span> <span class='ident'>num_threads</span> <span class='op'>=</span> <span class='number'>10</span>;
+<span class='kw'>let</span> <span class='ident'>pool</span> <span class='op'>=</span> <span class='ident'>ThreadPool</span>::<span class='ident'>new</span>(<span class='ident'>num_threads</span>);
+<span class='kw'>for</span> _ <span class='kw'>in</span> <span class='number'>0</span>..<span class='ident'>num_threads</span> {
+    <span class='ident'>pool</span>.<span class='ident'>execute</span>(<span class='kw'>move</span> <span class='op'>||</span> {
+        <span class='ident'>sleep</span>(<span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>5</span>));
+    });
+}
+<span class='ident'>sleep</span>(<span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>1</span>));
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>pool</span>.<span class='ident'>active_count</span>(), <span class='ident'>num_threads</span>);</pre>
+</div><h4 id='method.max_count' class='method'><span id='max_count.v' class='invisible'><code>fn <a href='#method.max_count' class='fnname'>max_count</a>(&amp;self) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a></code></span></h4>
+<div class='docblock'><p>Returns the number of created threads</p>
+</div><h4 id='method.panic_count' class='method'><span id='panic_count.v' class='invisible'><code>fn <a href='#method.panic_count' class='fnname'>panic_count</a>(&amp;self) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a></code></span></h4>
+<div class='docblock'><p>Returns the number of panicked threads over the lifetime of the pool.</p>
+
+<h1 id='examples-2' class='section-header'><a href='#examples-2'>Examples</a></h1>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>threadpool</span>::<span class='ident'>ThreadPool</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>time</span>::<span class='ident'>Duration</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep</span>;
+
+<span class='kw'>let</span> <span class='ident'>num_threads</span> <span class='op'>=</span> <span class='number'>10</span>;
+<span class='kw'>let</span> <span class='ident'>pool</span> <span class='op'>=</span> <span class='ident'>ThreadPool</span>::<span class='ident'>new</span>(<span class='ident'>num_threads</span>);
+<span class='kw'>for</span> _ <span class='kw'>in</span> <span class='number'>0</span>..<span class='ident'>num_threads</span> {
+    <span class='ident'>pool</span>.<span class='ident'>execute</span>(<span class='kw'>move</span> <span class='op'>||</span> {
+        <span class='macro'>panic</span><span class='macro'>!</span>()
+    });
+}
+<span class='ident'>sleep</span>(<span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>1</span>));
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>pool</span>.<span class='ident'>panic_count</span>(), <span class='ident'>num_threads</span>);</pre>
+</div><h4 id='method.set_threads' class='method'><span id='set_threads.v' class='invisible'><code>fn <a href='#method.set_threads' class='fnname'>set_threads</a>(&amp;mut self, num_threads: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>)</code></span></h4>
+<div class='stability'><em class='stab deprecated'>Deprecated since 1.3.0<p>: use ThreadPool::set_num_threads</p>
+</em></div><div class='docblock'><p><strong>Deprecated: Use <code>ThreadPool::set_num_threads</code></strong></p>
+</div><h4 id='method.set_num_threads' class='method'><span id='set_num_threads.v' class='invisible'><code>fn <a href='#method.set_num_threads' class='fnname'>set_num_threads</a>(&amp;mut self, num_threads: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>)</code></span></h4>
+<div class='docblock'><p>Sets the number of worker-threads to use as <code>num_threads</code>.
+Can be used to change the threadpool size during runtime.
+Will not abort already running or waiting threads.</p>
+
+<h1 id='panics-2' class='section-header'><a href='#panics-2'>Panics</a></h1>
+<p>This function will panic if <code>num_threads</code> is 0.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><span class='in-band'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-101' class='srclink' href='../src/threadpool/lib.rs.html#148' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.clone' class='method'><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class='method'><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div><h3 class='impl'><span class='in-band'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../threadpool/struct.ThreadPool.html' title='threadpool::ThreadPool'>ThreadPool</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-74' class='srclink' href='../src/threadpool/lib.rs.html#323-331' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class='method'><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, f: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "threadpool";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>
