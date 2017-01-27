@@ -11,6 +11,7 @@ documentation = "https://frewsxcv.github.io/rust-threadpool"
 description = """
 A thread pool for running a number of jobs on a fixed set of worker threads.
 """
+categories = ["concurrency"]
 
 [lib]
 path = "lib.rs"
