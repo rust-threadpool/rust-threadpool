@@ -15,7 +15,7 @@
 //!
 //! # Examples
 //!
-//! ## Syncronized with a channel
+//! ## Synchronized with a channel
 //!
 //! Every thread sends one message over the channel, which then is collected with the `take()`.
 //!
@@ -38,7 +38,7 @@
 //! assert_eq!(rx.iter().take(n_jobs).fold(0, |a, b| a + b), 8);
 //! ```
 //!
-//! ## Syncronized with a barrier
+//! ## Synchronized with a barrier
 //!
 //! Keep in mind, if a barrier synchronizes more jobs than you have workers in the pool,
 //! you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock)
