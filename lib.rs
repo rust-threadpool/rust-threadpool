@@ -184,7 +184,7 @@ impl ThreadPool {
     /// use threadpool::ThreadPool;
     ///
     /// let (tx, rx) = sync_channel(0);
-    /// let mut pool = ThreadPool::new_with_name("worker".into(), 2);
+    /// let mut pool = ThreadPool::new_with_name("worker", 2);
     /// for _ in 0..2 {
     ///     let tx = tx.clone();
     ///     pool.execute(move || {
@@ -199,8 +199,10 @@ impl ThreadPool {
     /// ```
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
-    pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(Some(name), num_threads)
+    pub fn new_with_name<S>(name: S, num_threads: usize) -> ThreadPool
+        where S: Into<String>
+    {
+        ThreadPool::new_pool(Some(name.into()), num_threads)
     }
 
     #[inline]
