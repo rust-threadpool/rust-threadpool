@@ -1,5 +1,9 @@
 # Changes
 
+## unreleased
+
+* [Internal shared data](https://github.com/frewsxcv/rust-threadpool/pull/67)
+
 ## 1.3.2
 
 * [Enable `#[deprecated]` doc, requires Rust 1.9](https://github.com/frewsxcv/rust-threadpool/pull/38)
