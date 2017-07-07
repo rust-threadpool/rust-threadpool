@@ -236,7 +236,7 @@ impl ThreadPool {
     pub fn execute<F>(&self, job: F)
         where F: FnOnce() + Send + 'static
     {
-        self.jobs.send(Box::new(move || job())).unwrap();
+        self.jobs.send(Box::new(job)).unwrap();
     }
 
     /// Returns the number of currently active threads.
