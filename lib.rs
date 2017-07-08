@@ -322,11 +322,11 @@ impl ThreadPool {
 
 impl fmt::Debug for ThreadPool {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "ThreadPool {{ name: {:?}, active_count: {}, max_count: {} }}",
-               self.name,
-               self.active_count(),
-               self.max_count())
+        f.debug_struct("ThreadPool")
+            .field("name", &self.name)
+            .field("active_count", &self.active_count())
+            .field("max_count", &self.max_count())
+            .finish()
     }
 }
 
