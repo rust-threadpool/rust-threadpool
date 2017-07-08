@@ -7,7 +7,7 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/frewsxcv/rust-threadpool"
 homepage = "https://github.com/frewsxcv/rust-threadpool"
-documentation = "https://frewsxcv.github.io/rust-threadpool"
+documentation = "https://docs.rs/threadpool"
 description = """
 A thread pool for running a number of jobs on a fixed set of worker threads.
 """
