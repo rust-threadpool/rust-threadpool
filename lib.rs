@@ -80,7 +80,7 @@
 
 use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{Builder, panicking};
 
@@ -137,9 +137,19 @@ impl<'a> Drop for Sentinel<'a> {
 }
 
 struct ThreadPoolSharedData {
+    empty_trigger: Mutex<bool>,
+    empty_condvar: Condvar,
+    stored_jobs_counter: AtomicUsize,
     active_count: AtomicUsize,
     max_thread_count: AtomicUsize,
     panic_count: AtomicUsize,
+}
+
+impl ThreadPoolSharedData {
+    fn has_work(&self) -> bool {
+        self.stored_jobs_counter.load(Ordering::SeqCst) > 0
+            || self.active_count.load(Ordering::SeqCst) > 0
+    }
 }
 
 /// Abstraction of a thread pool for basic parallelism.
@@ -207,6 +217,9 @@ impl ThreadPool {
         let rx = Arc::new(Mutex::new(rx));
 
         let shared_data = Arc::new(ThreadPoolSharedData {
+            empty_condvar: Condvar::new(),
+            empty_trigger: Mutex::new(false),
+            stored_jobs_counter: AtomicUsize::new(0),
             active_count: AtomicUsize::new(0),
             max_thread_count: AtomicUsize::new(num_threads),
             panic_count: AtomicUsize::new(0),
@@ -231,6 +244,7 @@ impl ThreadPool {
     pub fn execute<F>(&self, job: F)
         where F: FnOnce() + Send + 'static
     {
+        self.shared_data.stored_jobs_counter.fetch_add(1, Ordering::SeqCst);
         self.jobs.send(Box::new(job)).unwrap();
     }
 
@@ -310,6 +324,43 @@ impl ThreadPool {
             }
         }
     }
+    
+    /// Block the current thread until all jobs in the pool are completed.
+    /// Once waiting for the pool to complete you can no longer add new jobs, &mut self ensures that.
+    ///
+    /// ```
+    /// # use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    /// use std::sync::Arc;
+    /// use std::sync::atomic::{AtomicUsize, Ordering};
+    ///
+    /// let mut pool = ThreadPool::new_with_name("join test".to_string(), 8);
+    /// let test_count = Arc::new(AtomicUsize::new(0));
+    /// 
+    /// for _ in 0..42 {
+    ///     let test_count = test_count.clone();
+    ///     pool.execute(move || {
+    ///         sleep(Duration::from_secs(2));
+    ///         // this write must happen after the sleep
+    ///         test_count.fetch_add(1, Ordering::Relaxed);
+    ///     });
+    /// }
+    /// 
+    /// pool.join();
+    /// assert_eq!(42, test_count.load(Ordering::Relaxed));
+    /// ```
+    pub fn join(&mut self) {
+        while self.shared_data.has_work() {
+            let mut lock = self.shared_data.empty_trigger.lock().unwrap();
+            while *lock == false {
+                lock = self.shared_data.empty_condvar.wait(lock).unwrap();
+            }
+
+            // prepare the trigger for the next join
+            *lock = false;
+        }
+    }
 }
 
 
@@ -358,10 +409,15 @@ fn spawn_in_pool(name: Option<String>,
                 };
                 // Do not allow IR around the job execution
                 shared_data.active_count.fetch_add(1, Ordering::SeqCst);
+                shared_data.stored_jobs_counter.fetch_sub(1, Ordering::SeqCst);
 
                 job.call_box();
 
                 shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
+                if shared_data.has_work() == false {
+                    *shared_data.empty_trigger.lock().unwrap() = true;
+                    shared_data.empty_condvar.notify_all();
+                }
             }
 
             sentinel.cancel();
@@ -635,5 +691,38 @@ mod test {
         sleep(Duration::from_secs(1));
         let debug = format!("{:?}", pool);
         assert_eq!(debug, "ThreadPool { name: None, active_count: 1, max_count: 4 }");
+    }
+    
+    #[test]
+    fn test_multi_join() {
+        use std::time::Duration;
+        use std::thread::sleep;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let mut pool = ThreadPool::new_with_name("multi join test".into(), 8);
+        let test_count = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..42 {
+            let test_count = test_count.clone();
+            pool.execute(move || {
+                sleep(Duration::from_secs(2));
+                test_count.fetch_add(1, Ordering::Release);
+            });
+        }
+
+        println!("{:?}", pool);
+        pool.join();
+        assert_eq!(42, test_count.load(Ordering::Acquire));
+
+        for _ in 0..42 {
+            let test_count = test_count.clone();
+            pool.execute(move || {
+                sleep(Duration::from_secs(2));
+                test_count.fetch_add(1, Ordering::Relaxed);
+            });
+        }
+        pool.join();
+        assert_eq!(84, test_count.load(Ordering::Relaxed));
     }
 }
