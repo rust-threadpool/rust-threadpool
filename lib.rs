@@ -128,6 +128,7 @@ impl<'a> Drop for Sentinel<'a> {
             self.shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
             if panicking() {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
+                self.shared_data.no_work_notify_all();
             }
             spawn_in_pool(self.name.clone(),
                           self.jobs.clone(),
@@ -149,6 +150,14 @@ impl ThreadPoolSharedData {
     fn has_work(&self) -> bool {
         self.stored_jobs_counter.load(Ordering::SeqCst) > 0
             || self.active_count.load(Ordering::SeqCst) > 0
+    }
+
+    /// Notify all observers joining this pool if there is no more work to do.
+    fn no_work_notify_all(&self) {
+        if self.has_work() == false {
+            *self.empty_trigger.lock().unwrap() = true;
+            self.empty_condvar.notify_all();
+        }
     }
 }
 
@@ -264,6 +273,8 @@ impl ThreadPool {
     ///         sleep(Duration::from_secs(5));
     ///     });
     /// }
+    ///
+    /// // wait for the pool to start working
     /// sleep(Duration::from_secs(1));
     /// assert_eq!(pool.active_count(), num_threads);
     /// ```
@@ -282,17 +293,15 @@ impl ThreadPool {
     ///
     /// ```
     /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
     ///
     /// let num_threads = 10;
-    /// let pool = ThreadPool::new(num_threads);
+    /// let mut pool = ThreadPool::new(num_threads);
     /// for _ in 0..num_threads {
     ///     pool.execute(move || {
     ///         panic!()
     ///     });
     /// }
-    /// sleep(Duration::from_secs(1));
+    /// pool.join();
     /// assert_eq!(pool.panic_count(), num_threads);
     /// ```
     pub fn panic_count(&self) -> usize {
@@ -341,8 +350,8 @@ impl ThreadPool {
     /// for _ in 0..42 {
     ///     let test_count = test_count.clone();
     ///     pool.execute(move || {
+    ///         // Some long running calculation
     ///         sleep(Duration::from_secs(2));
-    ///         // this write must happen after the sleep
     ///         test_count.fetch_add(1, Ordering::Relaxed);
     ///     });
     /// }
@@ -414,10 +423,7 @@ fn spawn_in_pool(name: Option<String>,
                 job.call_box();
 
                 shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
-                if shared_data.has_work() == false {
-                    *shared_data.empty_trigger.lock().unwrap() = true;
-                    shared_data.empty_condvar.notify_all();
-                }
+                shared_data.no_work_notify_all();
             }
 
             sentinel.cancel();
@@ -441,21 +447,23 @@ mod test {
         let mut pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
+        sleep(Duration::from_secs(1));
+        assert_eq!(pool.active_count(), TEST_TASKS);
+
         pool.set_num_threads(new_thread_amount);
+
         for _ in 0..(new_thread_amount - TEST_TASKS) {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
         sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
+
+        pool.join();
     }
 
     #[test]
@@ -470,19 +478,19 @@ mod test {
         pool.set_num_threads(new_thread_amount);
         for _ in 0..new_thread_amount {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
         sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
+
+        pool.join();
     }
 
     #[test]
     fn test_active_count() {
         let pool = ThreadPool::new(TEST_TASKS);
-        for _ in 0..TEST_TASKS {
+        for _ in 0..2*TEST_TASKS {
             pool.execute(move || {
                 loop {
                     sleep(Duration::from_secs(10))
@@ -519,13 +527,13 @@ mod test {
 
     #[test]
     fn test_recovery_from_subtask_panic() {
-        let pool = ThreadPool::new(TEST_TASKS);
+        let mut pool = ThreadPool::new(TEST_TASKS);
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
-            pool.execute(move || { panic!() });
+            pool.execute(move || { panic!("Ignore this panic, it must!") });
         }
-        sleep(Duration::from_secs(1));
+        pool.join();
 
         assert_eq!(pool.panic_count(), TEST_TASKS);
 
@@ -566,7 +574,7 @@ mod test {
     fn test_massive_task_creation() {
         let test_tasks = 4_200_000;
 
-        let pool = ThreadPool::new(TEST_TASKS);
+        let mut pool = ThreadPool::new(TEST_TASKS);
         let b0 = Arc::new(Barrier::new(TEST_TASKS + 1));
         let b1 = Arc::new(Barrier::new(TEST_TASKS + 1));
 
@@ -594,10 +602,10 @@ mod test {
         b1.wait();
 
         assert_eq!(rx.iter().take(test_tasks).fold(0, |a, b| a + b), test_tasks);
-        // `iter().take(test_tasks).fold` may be faster than the last thread finishing itself, so
-        // values of 0 or 1 are ok.
+        pool.join();
+
         let atomic_active_count = pool.active_count();
-        assert!(atomic_active_count <= 1, "atomic_active_count: {}", atomic_active_count);
+        assert!(atomic_active_count == 0, "atomic_active_count: {}", atomic_active_count);
     }
 
     #[test]
