@@ -335,7 +335,7 @@ impl ThreadPool {
     }
     
     /// Block the current thread until all jobs in the pool are completed.
-    /// Once waiting for the pool to complete you can no longer add new jobs, &mut self ensures that.
+    /// Many threads can wait for a pool to finish concurrently.
     ///
     /// ```
     /// use threadpool::ThreadPool;
@@ -344,7 +344,7 @@ impl ThreadPool {
     /// use std::sync::Arc;
     /// use std::sync::atomic::{AtomicUsize, Ordering};
     ///
-    /// let mut pool = ThreadPool::new_with_name("join test".to_string(), 8);
+    /// let pool = ThreadPool::new_with_name("join test".to_string(), 8);
     /// let test_count = Arc::new(AtomicUsize::new(0));
     /// 
     /// for _ in 0..42 {
@@ -359,7 +359,7 @@ impl ThreadPool {
     /// pool.join();
     /// assert_eq!(42, test_count.load(Ordering::Relaxed));
     /// ```
-    pub fn join(&mut self) {
+    pub fn join(&self) {
         while self.shared_data.has_work() {
             let mut lock = self.shared_data.empty_trigger.lock().unwrap();
             while *lock == false {
@@ -382,6 +382,8 @@ impl fmt::Debug for ThreadPool {
             .finish()
     }
 }
+
+unsafe impl Sync for ThreadPool { }
 
 
 fn spawn_in_pool(name: Option<String>,
@@ -529,7 +531,7 @@ mod test {
 
     #[test]
     fn test_recovery_from_subtask_panic() {
-        let mut pool = ThreadPool::new(TEST_TASKS);
+        let pool = ThreadPool::new(TEST_TASKS);
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
@@ -576,7 +578,7 @@ mod test {
     fn test_massive_task_creation() {
         let test_tasks = 4_200_000;
 
-        let mut pool = ThreadPool::new(TEST_TASKS);
+        let pool = ThreadPool::new(TEST_TASKS);
         let b0 = Arc::new(Barrier::new(TEST_TASKS + 1));
         let b1 = Arc::new(Barrier::new(TEST_TASKS + 1));
 
@@ -729,5 +731,61 @@ mod test {
         }
         pool.join();
         assert_eq!(84, test_count.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_multi_join() {
+        use std::sync::mpsc::TryRecvError::*;
+
+        let pool0 = Arc::new(ThreadPool::new_with_name("multi join pool0".into(), 8));
+        let pool1 = Arc::new(ThreadPool::new_with_name("multi join pool1".into(), 8));
+        let (tx, rx) = channel();
+
+        for i in 0..4 {
+            let pool1  = pool1.clone();
+            let pool0_ = pool0.clone();
+            let tx = tx.clone();
+            pool0.execute(move || {
+                pool1.execute(move || {
+                    pool0_.join();
+                    tx.send(i).unwrap();
+                });
+            });
+        }
+
+        assert_eq!(rx.try_recv(), Err(Empty));
+        pool0.join();
+        pool1.join();
+        assert_eq!(rx.iter().sum::<usize>(), 1+2+3);
+    }
+
+    #[test]
+    fn test_empty_pool() {
+        // Joining an empty pool must return imminently
+        let pool = ThreadPool::new(4);
+
+        pool.join();
+
+        assert!(true);
+    }
+
+    #[test]
+    fn test_no_fun_or_joy() {
+        // What happens when you keep adding jobs after a join
+
+        fn sleepy_function() {
+            sleep(Duration::from_secs(6));
+        }
+
+        let pool = Arc::new(ThreadPool::new(8));
+
+        pool.execute(sleepy_function);
+
+        let p_t = pool.clone();
+        thread::spawn(move || {
+            (0..23).map(|_| p_t.execute(sleepy_function)).next();
+        });
+
+        pool.join();
     }
 }
