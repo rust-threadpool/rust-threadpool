@@ -140,7 +140,7 @@ impl<'a> Drop for Sentinel<'a> {
 struct ThreadPoolSharedData {
     empty_trigger: Mutex<bool>,
     empty_condvar: Condvar,
-    stored_jobs_counter: AtomicUsize,
+    queued_count: AtomicUsize,
     active_count: AtomicUsize,
     max_thread_count: AtomicUsize,
     panic_count: AtomicUsize,
@@ -148,13 +148,13 @@ struct ThreadPoolSharedData {
 
 impl ThreadPoolSharedData {
     fn has_work(&self) -> bool {
-        self.stored_jobs_counter.load(Ordering::SeqCst) > 0
+        self.queued_count.load(Ordering::SeqCst) > 0
             || self.active_count.load(Ordering::SeqCst) > 0
     }
 
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
-        if self.has_work() == false {
+        if !self.has_work() {
             *self.empty_trigger.lock().unwrap() = true;
             self.empty_condvar.notify_all();
         }
@@ -228,7 +228,7 @@ impl ThreadPool {
         let shared_data = Arc::new(ThreadPoolSharedData {
             empty_condvar: Condvar::new(),
             empty_trigger: Mutex::new(false),
-            stored_jobs_counter: AtomicUsize::new(0),
+            queued_count: AtomicUsize::new(0),
             active_count: AtomicUsize::new(0),
             max_thread_count: AtomicUsize::new(num_threads),
             panic_count: AtomicUsize::new(0),
@@ -253,7 +253,7 @@ impl ThreadPool {
     pub fn execute<F>(&self, job: F)
         where F: FnOnce() + Send + 'static
     {
-        self.shared_data.stored_jobs_counter.fetch_add(1, Ordering::SeqCst);
+        self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
         self.jobs.send(Box::new(job)).unwrap();
     }
 
@@ -338,7 +338,7 @@ impl ThreadPool {
     /// Once waiting for the pool to complete you can no longer add new jobs, &mut self ensures that.
     ///
     /// ```
-    /// # use threadpool::ThreadPool;
+    /// use threadpool::ThreadPool;
     /// use std::time::Duration;
     /// use std::thread::sleep;
     /// use std::sync::Arc;
@@ -418,7 +418,7 @@ fn spawn_in_pool(name: Option<String>,
                 };
                 // Do not allow IR around the job execution
                 shared_data.active_count.fetch_add(1, Ordering::SeqCst);
-                shared_data.stored_jobs_counter.fetch_sub(1, Ordering::SeqCst);
+                shared_data.queued_count.fetch_sub(1, Ordering::SeqCst);
 
                 job.call_box();
 
