@@ -433,9 +433,11 @@ fn spawn_in_pool(name: Option<String>,
 
 #[cfg(test)]
 mod test {
-    use super::ThreadPool;
-    use std::sync::mpsc::{sync_channel, channel};
-    use std::sync::{Arc, Barrier};
+    // use everything included in the outer scope
+    use super::*;
+    // this is only for tests
+    use std::sync::mpsc::sync_channel;
+    use std::sync::Barrier;
     use std::thread::{self, sleep};
     use std::time::Duration;
 
@@ -702,13 +704,8 @@ mod test {
     }
     
     #[test]
-    fn test_multi_join() {
-        use std::time::Duration;
-        use std::thread::sleep;
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let mut pool = ThreadPool::new_with_name("multi join test".into(), 8);
+    fn test_repeate_join() {
+        let pool = ThreadPool::new_with_name("repeate join test".into(), 8);
         let test_count = Arc::new(AtomicUsize::new(0));
 
         for _ in 0..42 {
