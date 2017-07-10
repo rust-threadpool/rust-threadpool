@@ -122,8 +122,8 @@ impl<'a> Drop for Sentinel<'a> {
             self.shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
             if panicking() {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
-                self.shared_data.no_work_notify_all();
             }
+            self.shared_data.no_work_notify_all();
             spawn_in_pool(self.shared_data.clone())
         }
     }
@@ -132,7 +132,7 @@ impl<'a> Drop for Sentinel<'a> {
 struct ThreadPoolSharedData {
     name: Option<String>,
     job_receiver: Mutex<Receiver<Thunk<'static>>>,
-    empty_trigger: Mutex<bool>,
+    empty_trigger: Mutex< () >,
     empty_condvar: Condvar,
     queued_count: AtomicUsize,
     active_count: AtomicUsize,
@@ -149,7 +149,7 @@ impl ThreadPoolSharedData {
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
         if !self.has_work() {
-            *self.empty_trigger.lock().unwrap() = true;
+            *self.empty_trigger.lock().unwrap();
             self.empty_condvar.notify_all();
         }
     }
@@ -220,7 +220,7 @@ impl ThreadPool {
             name: name,
             job_receiver: Mutex::new(rx),
             empty_condvar: Condvar::new(),
-            empty_trigger: Mutex::new(false),
+            empty_trigger: Mutex::new( () ),
             queued_count: AtomicUsize::new(0),
             active_count: AtomicUsize::new(0),
             max_thread_count: AtomicUsize::new(num_threads),
@@ -244,6 +244,11 @@ impl ThreadPool {
     {
         self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
         self.jobs.send(Box::new(job)).expect("ThreadPool::execute unable to send job into queue.");
+    }
+
+    /// Returns the number of accepted jobs
+    pub fn queued_count(&self) -> usize {
+        self.shared_data.queued_count.load(Ordering::Relaxed)
     }
 
     /// Returns the number of currently active threads.
@@ -284,7 +289,7 @@ impl ThreadPool {
     /// use threadpool::ThreadPool;
     ///
     /// let num_threads = 10;
-    /// let mut pool = ThreadPool::new(num_threads);
+    /// let pool = ThreadPool::new(num_threads);
     /// for _ in 0..num_threads {
     ///     pool.execute(move || {
     ///         panic!()
@@ -349,12 +354,9 @@ impl ThreadPool {
     pub fn join(&self) {
         while self.shared_data.has_work() {
             let mut lock = self.shared_data.empty_trigger.lock().unwrap();
-            while *lock == false {
+            while self.shared_data.has_work() {
                 lock = self.shared_data.empty_condvar.wait(lock).unwrap();
             }
-
-            // prepare the trigger for the next join
-            *lock = false;
         }
     }
 }
@@ -364,6 +366,7 @@ impl fmt::Debug for ThreadPool {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ThreadPool")
             .field("name", &self.shared_data.name)
+            .field("queued_count", &self.queued_count())
             .field("active_count", &self.active_count())
             .field("max_count", &self.max_count())
             .finish()
@@ -670,11 +673,11 @@ mod test {
     fn test_debug() {
         let pool = ThreadPool::new(4);
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: None, active_count: 0, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: None, queued_count: 0, active_count: 0, max_count: 4 }");
 
         let pool = ThreadPool::new_with_name("hello".into(), 4);
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), active_count: 0, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), queued_count: 0, active_count: 0, max_count: 4 }");
 
         let pool = ThreadPool::new(4);
         pool.execute(move || {
@@ -682,7 +685,7 @@ mod test {
         });
         sleep(Duration::from_secs(1));
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: None, active_count: 1, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: None, queued_count: 0, active_count: 1, max_count: 4 }");
     }
     
     #[test]
@@ -717,6 +720,14 @@ mod test {
     fn test_multi_join() {
         use std::sync::mpsc::TryRecvError::*;
 
+        // Toggle the following lines to debug the deadlock
+        fn error(_s: String) {
+            //use ::std::io::Write;
+            //let stderr = ::std::io::stderr();
+            //let mut stderr = stderr.lock();
+            //stderr.write(&_s.as_bytes()).is_ok();
+        }
+
         let pool0 = ThreadPool::new_with_name("multi join pool0".into(), 4);
         let pool1 = ThreadPool::new_with_name("multi join pool1".into(), 4);
         let (tx, rx) = channel();
@@ -726,17 +737,25 @@ mod test {
             let pool0_ = pool0.clone();
             let tx = tx.clone();
             pool0.execute(move || {
+                //sleep(Duration::from_millis(13*i));
                 pool1.execute(move || {
+                    error(format!("p1: {} -=- {:?}\n", i, pool0_));
                     pool0_.join();
+                    error(format!("p1: send({})\n", i));
                     tx.send(i).expect("send i from pool1 -> main");
                 });
+                error(format!("p0: {}\n", i));
             });
         }
+        drop(tx);
 
         assert_eq!(rx.try_recv(), Err(Empty));
+        error(format!("{:?}\n{:?}\n", pool0, pool1));
         pool0.join();
+        error(format!("pool0.join() complete =-= {:?}", pool1));
         pool1.join();
-        assert_eq!(rx.iter().fold(0, |acc, i| acc + i), 1+2+3);
+        error("pool1.join() complete\n".into());
+        assert_eq!(rx.iter().fold(0, |acc, i| acc + i), 0+1+2+3+4+5+6+7);
     }
 
     #[test]
