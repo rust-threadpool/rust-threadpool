@@ -370,8 +370,6 @@ impl fmt::Debug for ThreadPool {
     }
 }
 
-//unsafe impl Sync for ThreadPool { }
-
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
@@ -738,7 +736,7 @@ mod test {
         assert_eq!(rx.try_recv(), Err(Empty));
         pool0.join();
         pool1.join();
-        assert_eq!(rx.iter().sum::<usize>(), 1+2+3);
+        assert_eq!(rx.iter().fold(0, |acc, i| acc + i), 1+2+3);
     }
 
     #[test]
