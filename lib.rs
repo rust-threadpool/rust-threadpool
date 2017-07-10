@@ -97,20 +97,14 @@ impl<F: FnOnce()> FnBox for F {
 type Thunk<'a> = Box<FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
-    name: Option<String>,
-    jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
     shared_data: &'a Arc<ThreadPoolSharedData>,
     active: bool,
 }
 
 impl<'a> Sentinel<'a> {
-    fn new(name: Option<String>,
-           jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
-           shared_data: &'a Arc<ThreadPoolSharedData>)
+    fn new(shared_data: &'a Arc<ThreadPoolSharedData>)
            -> Sentinel<'a> {
         Sentinel {
-            name: name,
-            jobs: jobs,
             shared_data: shared_data,
             active: true,
         }
@@ -130,14 +124,14 @@ impl<'a> Drop for Sentinel<'a> {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
                 self.shared_data.no_work_notify_all();
             }
-            spawn_in_pool(self.name.clone(),
-                          self.jobs.clone(),
-                          self.shared_data.clone())
+            spawn_in_pool(self.shared_data.clone())
         }
     }
 }
 
 struct ThreadPoolSharedData {
+    name: Option<String>,
+    job_receiver: Mutex<Receiver<Thunk<'static>>>,
     empty_trigger: Mutex<bool>,
     empty_condvar: Condvar,
     queued_count: AtomicUsize,
@@ -168,9 +162,7 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
-    name: Option<String>,
     jobs: Sender<Thunk<'static>>,
-    job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
     shared_data: Arc<ThreadPoolSharedData>,
 }
 
@@ -223,9 +215,10 @@ impl ThreadPool {
         assert!(num_threads >= 1);
 
         let (tx, rx) = channel::<Thunk<'static>>();
-        let rx = Arc::new(Mutex::new(rx));
 
         let shared_data = Arc::new(ThreadPoolSharedData {
+            name: name,
+            job_receiver: Mutex::new(rx),
             empty_condvar: Condvar::new(),
             empty_trigger: Mutex::new(false),
             queued_count: AtomicUsize::new(0),
@@ -236,15 +229,11 @@ impl ThreadPool {
 
         // Threadpool threads
         for _ in 0..num_threads {
-            spawn_in_pool(name.clone(),
-                          rx.clone(),
-                          shared_data.clone());
+            spawn_in_pool(shared_data.clone());
         }
 
         ThreadPool {
-            name: name,
             jobs: tx,
-            job_receiver: rx,
             shared_data: shared_data,
         }
     }
@@ -254,7 +243,7 @@ impl ThreadPool {
         where F: FnOnce() + Send + 'static
     {
         self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
-        self.jobs.send(Box::new(job)).unwrap();
+        self.jobs.send(Box::new(job)).expect("ThreadPool::execute unable to send job into queue.");
     }
 
     /// Returns the number of currently active threads.
@@ -327,9 +316,7 @@ impl ThreadPool {
         if let Some(num_spawn) = num_threads.checked_sub(prev_num_threads) {
             // Spawn new threads
             for _ in 0..num_spawn {
-                spawn_in_pool(self.name.clone(),
-                              self.job_receiver.clone(),
-                              self.shared_data.clone());
+                spawn_in_pool(self.shared_data.clone());
             }
         }
     }
@@ -376,28 +363,24 @@ impl ThreadPool {
 impl fmt::Debug for ThreadPool {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ThreadPool")
-            .field("name", &self.name)
+            .field("name", &self.shared_data.name)
             .field("active_count", &self.active_count())
             .field("max_count", &self.max_count())
             .finish()
     }
 }
 
-unsafe impl Sync for ThreadPool { }
+//unsafe impl Sync for ThreadPool { }
 
 
-fn spawn_in_pool(name: Option<String>,
-                 jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
-                 shared_data: Arc<ThreadPoolSharedData>) {
+fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
-    if let Some(ref name) = name {
+    if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
             // Will spawn a new thread on panic unless it is cancelled.
-            let sentinel = Sentinel::new(name,
-                                         &jobs,
-                                         &shared_data);
+            let sentinel = Sentinel::new(&shared_data);
 
             loop {
                 // Shutdown this thread if the pool has become smaller
@@ -409,7 +392,7 @@ fn spawn_in_pool(name: Option<String>,
                 let message = {
                     // Only lock jobs for the time it takes
                     // to get a job, not run it.
-                    let lock = jobs.lock().unwrap();
+                    let lock = shared_data.job_receiver.lock().expect("Worker thread unable to lock job_receiver");
                     lock.recv()
                 };
 
@@ -736,18 +719,18 @@ mod test {
     fn test_multi_join() {
         use std::sync::mpsc::TryRecvError::*;
 
-        let pool0 = Arc::new(ThreadPool::new_with_name("multi join pool0".into(), 8));
-        let pool1 = Arc::new(ThreadPool::new_with_name("multi join pool1".into(), 8));
+        let pool0 = ThreadPool::new_with_name("multi join pool0".into(), 4);
+        let pool1 = ThreadPool::new_with_name("multi join pool1".into(), 4);
         let (tx, rx) = channel();
 
-        for i in 0..4 {
+        for i in 0..8 {
             let pool1  = pool1.clone();
             let pool0_ = pool0.clone();
             let tx = tx.clone();
             pool0.execute(move || {
                 pool1.execute(move || {
                     pool0_.join();
-                    tx.send(i).unwrap();
+                    tx.send(i).expect("send i from pool1 -> main");
                 });
             });
         }
@@ -776,13 +759,13 @@ mod test {
             sleep(Duration::from_secs(6));
         }
 
-        let pool = Arc::new(ThreadPool::new(8));
+        let pool = ThreadPool::new_with_name("no fun or joy".into(), 8);
 
         pool.execute(sleepy_function);
 
         let p_t = pool.clone();
         thread::spawn(move || {
-            (0..23).map(|_| p_t.execute(sleepy_function)).next();
+            (0..23).map(|_| p_t.execute(sleepy_function)).count();
         });
 
         pool.join();
