@@ -435,11 +435,10 @@ fn spawn_in_pool(name: Option<String>,
 
 #[cfg(test)]
 mod test {
-    // use everything included in the outer scope
-    use super::*;
-    // this is only for tests
-    use std::sync::mpsc::sync_channel;
-    use std::sync::Barrier;
+    use super::ThreadPool;
+    use std::sync::{Arc, Barrier};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::mpsc::{sync_channel, channel};
     use std::thread::{self, sleep};
     use std::time::Duration;
 
