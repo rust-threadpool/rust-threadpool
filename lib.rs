@@ -355,6 +355,17 @@ impl ThreadPool {
     /// Returns a guard object that will block the current thread until the
     /// pool as soon as the gard gets out of scope.
     ///
+    /// This method has to be called on every `ThreadPool` instance induvidually.
+    ///
+    /// # Warning
+    ///
+    /// Creating or moving a `JoinOnDrop` inside its own pool will cause a dealock.
+    ///
+    /// # Example
+    ///
+    /// The function `do_work_in_parallel` uses the `join_on_drop` feature to
+    /// ensure all the work has completet when it returns.
+    ///
     /// ```
     /// use threadpool::{ThreadPool, JoinOnDrop};
     /// use std::sync::Arc;
