@@ -321,7 +321,7 @@ impl ThreadPool {
             }
         }
     }
-    
+
     /// Block the current thread until all jobs in the pool are completed.
     /// Many threads can wait for a pool to finish concurrently.
     ///
@@ -334,7 +334,7 @@ impl ThreadPool {
     ///
     /// let pool = ThreadPool::new_with_name("join test".to_string(), 8);
     /// let test_count = Arc::new(AtomicUsize::new(0));
-    /// 
+    ///
     /// for _ in 0..42 {
     ///     let test_count = test_count.clone();
     ///     pool.execute(move || {
@@ -343,7 +343,7 @@ impl ThreadPool {
     ///         test_count.fetch_add(1, Ordering::Relaxed);
     ///     });
     /// }
-    /// 
+    ///
     /// pool.join();
     /// assert_eq!(42, test_count.load(Ordering::Relaxed));
     /// ```
