@@ -1,9 +1,8 @@
 # Changes
 
-## unreleased
+## 1.4.0
 
-* [Internal shared data](https://github.com/frewsxcv/rust-threadpool/pull/67)
-* [Implementation of the join operation](https://github.com/frewsxcv/rust-threadpool/pull/63)
+* [Implementation of the `join` operation](https://github.com/frewsxcv/rust-threadpool/pull/63)
 
 ## 1.3.2
 
