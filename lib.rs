@@ -327,19 +327,15 @@ impl ThreadPool {
     ///
     /// ```
     /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
     /// use std::sync::Arc;
     /// use std::sync::atomic::{AtomicUsize, Ordering};
     ///
-    /// let pool = ThreadPool::new_with_name("join test".to_string(), 8);
+    /// let pool = ThreadPool::new(8);
     /// let test_count = Arc::new(AtomicUsize::new(0));
     ///
     /// for _ in 0..42 {
     ///     let test_count = test_count.clone();
     ///     pool.execute(move || {
-    ///         // Some long running calculation
-    ///         sleep(Duration::from_secs(2));
     ///         test_count.fetch_add(1, Ordering::Relaxed);
     ///     });
     /// }
