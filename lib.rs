@@ -80,7 +80,7 @@
 
 use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{Builder, panicking};
 
@@ -97,20 +97,14 @@ impl<F: FnOnce()> FnBox for F {
 type Thunk<'a> = Box<FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
-    name: Option<String>,
-    jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
     shared_data: &'a Arc<ThreadPoolSharedData>,
     active: bool,
 }
 
 impl<'a> Sentinel<'a> {
-    fn new(name: Option<String>,
-           jobs: &'a Arc<Mutex<Receiver<Thunk<'static>>>>,
-           shared_data: &'a Arc<ThreadPoolSharedData>)
+    fn new(shared_data: &'a Arc<ThreadPoolSharedData>)
            -> Sentinel<'a> {
         Sentinel {
-            name: name,
-            jobs: jobs,
             shared_data: shared_data,
             active: true,
         }
@@ -129,17 +123,36 @@ impl<'a> Drop for Sentinel<'a> {
             if panicking() {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
             }
-            spawn_in_pool(self.name.clone(),
-                          self.jobs.clone(),
-                          self.shared_data.clone())
+            self.shared_data.no_work_notify_all();
+            spawn_in_pool(self.shared_data.clone())
         }
     }
 }
 
 struct ThreadPoolSharedData {
+    name: Option<String>,
+    job_receiver: Mutex<Receiver<Thunk<'static>>>,
+    empty_trigger: Mutex< () >,
+    empty_condvar: Condvar,
+    queued_count: AtomicUsize,
     active_count: AtomicUsize,
     max_thread_count: AtomicUsize,
     panic_count: AtomicUsize,
+}
+
+impl ThreadPoolSharedData {
+    fn has_work(&self) -> bool {
+        self.queued_count.load(Ordering::SeqCst) > 0
+            || self.active_count.load(Ordering::SeqCst) > 0
+    }
+
+    /// Notify all observers joining this pool if there is no more work to do.
+    fn no_work_notify_all(&self) {
+        if !self.has_work() {
+            *self.empty_trigger.lock().unwrap();
+            self.empty_condvar.notify_all();
+        }
+    }
 }
 
 /// Abstraction of a thread pool for basic parallelism.
@@ -149,9 +162,7 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
-    name: Option<String>,
     jobs: Sender<Thunk<'static>>,
-    job_receiver: Arc<Mutex<Receiver<Thunk<'static>>>>,
     shared_data: Arc<ThreadPoolSharedData>,
 }
 
@@ -204,9 +215,13 @@ impl ThreadPool {
         assert!(num_threads >= 1);
 
         let (tx, rx) = channel::<Thunk<'static>>();
-        let rx = Arc::new(Mutex::new(rx));
 
         let shared_data = Arc::new(ThreadPoolSharedData {
+            name: name,
+            job_receiver: Mutex::new(rx),
+            empty_condvar: Condvar::new(),
+            empty_trigger: Mutex::new( () ),
+            queued_count: AtomicUsize::new(0),
             active_count: AtomicUsize::new(0),
             max_thread_count: AtomicUsize::new(num_threads),
             panic_count: AtomicUsize::new(0),
@@ -214,15 +229,11 @@ impl ThreadPool {
 
         // Threadpool threads
         for _ in 0..num_threads {
-            spawn_in_pool(name.clone(),
-                          rx.clone(),
-                          shared_data.clone());
+            spawn_in_pool(shared_data.clone());
         }
 
         ThreadPool {
-            name: name,
             jobs: tx,
-            job_receiver: rx,
             shared_data: shared_data,
         }
     }
@@ -231,7 +242,13 @@ impl ThreadPool {
     pub fn execute<F>(&self, job: F)
         where F: FnOnce() + Send + 'static
     {
-        self.jobs.send(Box::new(job)).unwrap();
+        self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
+        self.jobs.send(Box::new(job)).expect("ThreadPool::execute unable to send job into queue.");
+    }
+
+    /// Returns the number of accepted jobs
+    pub fn queued_count(&self) -> usize {
+        self.shared_data.queued_count.load(Ordering::Relaxed)
     }
 
     /// Returns the number of currently active threads.
@@ -250,6 +267,8 @@ impl ThreadPool {
     ///         sleep(Duration::from_secs(5));
     ///     });
     /// }
+    ///
+    /// // wait for the pool to start working
     /// sleep(Duration::from_secs(1));
     /// assert_eq!(pool.active_count(), num_threads);
     /// ```
@@ -268,8 +287,6 @@ impl ThreadPool {
     ///
     /// ```
     /// use threadpool::ThreadPool;
-    /// use std::time::Duration;
-    /// use std::thread::sleep;
     ///
     /// let num_threads = 10;
     /// let pool = ThreadPool::new(num_threads);
@@ -278,7 +295,7 @@ impl ThreadPool {
     ///         panic!()
     ///     });
     /// }
-    /// sleep(Duration::from_secs(1));
+    /// pool.join();
     /// assert_eq!(pool.panic_count(), num_threads);
     /// ```
     pub fn panic_count(&self) -> usize {
@@ -304,9 +321,41 @@ impl ThreadPool {
         if let Some(num_spawn) = num_threads.checked_sub(prev_num_threads) {
             // Spawn new threads
             for _ in 0..num_spawn {
-                spawn_in_pool(self.name.clone(),
-                              self.job_receiver.clone(),
-                              self.shared_data.clone());
+                spawn_in_pool(self.shared_data.clone());
+            }
+        }
+    }
+    
+    /// Block the current thread until all jobs in the pool are completed.
+    /// Many threads can wait for a pool to finish concurrently.
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    /// use std::sync::Arc;
+    /// use std::sync::atomic::{AtomicUsize, Ordering};
+    ///
+    /// let pool = ThreadPool::new_with_name("join test".to_string(), 8);
+    /// let test_count = Arc::new(AtomicUsize::new(0));
+    /// 
+    /// for _ in 0..42 {
+    ///     let test_count = test_count.clone();
+    ///     pool.execute(move || {
+    ///         // Some long running calculation
+    ///         sleep(Duration::from_secs(2));
+    ///         test_count.fetch_add(1, Ordering::Relaxed);
+    ///     });
+    /// }
+    /// 
+    /// pool.join();
+    /// assert_eq!(42, test_count.load(Ordering::Relaxed));
+    /// ```
+    pub fn join(&self) {
+        while self.shared_data.has_work() {
+            let mut lock = self.shared_data.empty_trigger.lock().unwrap();
+            while self.shared_data.has_work() {
+                lock = self.shared_data.empty_condvar.wait(lock).unwrap();
             }
         }
     }
@@ -316,7 +365,8 @@ impl ThreadPool {
 impl fmt::Debug for ThreadPool {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ThreadPool")
-            .field("name", &self.name)
+            .field("name", &self.shared_data.name)
+            .field("queued_count", &self.queued_count())
             .field("active_count", &self.active_count())
             .field("max_count", &self.max_count())
             .finish()
@@ -324,18 +374,14 @@ impl fmt::Debug for ThreadPool {
 }
 
 
-fn spawn_in_pool(name: Option<String>,
-                 jobs: Arc<Mutex<Receiver<Thunk<'static>>>>,
-                 shared_data: Arc<ThreadPoolSharedData>) {
+fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
-    if let Some(ref name) = name {
+    if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
     }
     builder.spawn(move || {
             // Will spawn a new thread on panic unless it is cancelled.
-            let sentinel = Sentinel::new(name,
-                                         &jobs,
-                                         &shared_data);
+            let sentinel = Sentinel::new(&shared_data);
 
             loop {
                 // Shutdown this thread if the pool has become smaller
@@ -347,7 +393,7 @@ fn spawn_in_pool(name: Option<String>,
                 let message = {
                     // Only lock jobs for the time it takes
                     // to get a job, not run it.
-                    let lock = jobs.lock().unwrap();
+                    let lock = shared_data.job_receiver.lock().expect("Worker thread unable to lock job_receiver");
                     lock.recv()
                 };
 
@@ -358,10 +404,12 @@ fn spawn_in_pool(name: Option<String>,
                 };
                 // Do not allow IR around the job execution
                 shared_data.active_count.fetch_add(1, Ordering::SeqCst);
+                shared_data.queued_count.fetch_sub(1, Ordering::SeqCst);
 
                 job.call_box();
 
                 shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
+                shared_data.no_work_notify_all();
             }
 
             sentinel.cancel();
@@ -372,8 +420,9 @@ fn spawn_in_pool(name: Option<String>,
 #[cfg(test)]
 mod test {
     use super::ThreadPool;
-    use std::sync::mpsc::{sync_channel, channel};
     use std::sync::{Arc, Barrier};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::mpsc::{sync_channel, channel};
     use std::thread::{self, sleep};
     use std::time::Duration;
 
@@ -385,21 +434,23 @@ mod test {
         let mut pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
+        sleep(Duration::from_secs(1));
+        assert_eq!(pool.active_count(), TEST_TASKS);
+
         pool.set_num_threads(new_thread_amount);
+
         for _ in 0..(new_thread_amount - TEST_TASKS) {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
         sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
+
+        pool.join();
     }
 
     #[test]
@@ -414,19 +465,19 @@ mod test {
         pool.set_num_threads(new_thread_amount);
         for _ in 0..new_thread_amount {
             pool.execute(move || {
-                loop {
-                    sleep(Duration::from_secs(10))
-                }
+                sleep(Duration::from_secs(23))
             });
         }
         sleep(Duration::from_secs(1));
         assert_eq!(pool.active_count(), new_thread_amount);
+
+        pool.join();
     }
 
     #[test]
     fn test_active_count() {
         let pool = ThreadPool::new(TEST_TASKS);
-        for _ in 0..TEST_TASKS {
+        for _ in 0..2*TEST_TASKS {
             pool.execute(move || {
                 loop {
                     sleep(Duration::from_secs(10))
@@ -467,9 +518,9 @@ mod test {
 
         // Panic all the existing threads.
         for _ in 0..TEST_TASKS {
-            pool.execute(move || { panic!() });
+            pool.execute(move || { panic!("Ignore this panic, it must!") });
         }
-        sleep(Duration::from_secs(1));
+        pool.join();
 
         assert_eq!(pool.panic_count(), TEST_TASKS);
 
@@ -538,10 +589,10 @@ mod test {
         b1.wait();
 
         assert_eq!(rx.iter().take(test_tasks).fold(0, |a, b| a + b), test_tasks);
-        // `iter().take(test_tasks).fold` may be faster than the last thread finishing itself, so
-        // values of 0 or 1 are ok.
+        pool.join();
+
         let atomic_active_count = pool.active_count();
-        assert!(atomic_active_count <= 1, "atomic_active_count: {}", atomic_active_count);
+        assert!(atomic_active_count == 0, "atomic_active_count: {}", atomic_active_count);
     }
 
     #[test]
@@ -622,11 +673,11 @@ mod test {
     fn test_debug() {
         let pool = ThreadPool::new(4);
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: None, active_count: 0, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: None, queued_count: 0, active_count: 0, max_count: 4 }");
 
         let pool = ThreadPool::new_with_name("hello".into(), 4);
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), active_count: 0, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), queued_count: 0, active_count: 0, max_count: 4 }");
 
         let pool = ThreadPool::new(4);
         pool.execute(move || {
@@ -634,6 +685,106 @@ mod test {
         });
         sleep(Duration::from_secs(1));
         let debug = format!("{:?}", pool);
-        assert_eq!(debug, "ThreadPool { name: None, active_count: 1, max_count: 4 }");
+        assert_eq!(debug, "ThreadPool { name: None, queued_count: 0, active_count: 1, max_count: 4 }");
+    }
+    
+    #[test]
+    fn test_repeate_join() {
+        let pool = ThreadPool::new_with_name("repeate join test".into(), 8);
+        let test_count = Arc::new(AtomicUsize::new(0));
+
+        for _ in 0..42 {
+            let test_count = test_count.clone();
+            pool.execute(move || {
+                sleep(Duration::from_secs(2));
+                test_count.fetch_add(1, Ordering::Release);
+            });
+        }
+
+        println!("{:?}", pool);
+        pool.join();
+        assert_eq!(42, test_count.load(Ordering::Acquire));
+
+        for _ in 0..42 {
+            let test_count = test_count.clone();
+            pool.execute(move || {
+                sleep(Duration::from_secs(2));
+                test_count.fetch_add(1, Ordering::Relaxed);
+            });
+        }
+        pool.join();
+        assert_eq!(84, test_count.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_multi_join() {
+        use std::sync::mpsc::TryRecvError::*;
+
+        // Toggle the following lines to debug the deadlock
+        fn error(_s: String) {
+            //use ::std::io::Write;
+            //let stderr = ::std::io::stderr();
+            //let mut stderr = stderr.lock();
+            //stderr.write(&_s.as_bytes()).is_ok();
+        }
+
+        let pool0 = ThreadPool::new_with_name("multi join pool0".into(), 4);
+        let pool1 = ThreadPool::new_with_name("multi join pool1".into(), 4);
+        let (tx, rx) = channel();
+
+        for i in 0..8 {
+            let pool1  = pool1.clone();
+            let pool0_ = pool0.clone();
+            let tx = tx.clone();
+            pool0.execute(move || {
+                //sleep(Duration::from_millis(13*i));
+                pool1.execute(move || {
+                    error(format!("p1: {} -=- {:?}\n", i, pool0_));
+                    pool0_.join();
+                    error(format!("p1: send({})\n", i));
+                    tx.send(i).expect("send i from pool1 -> main");
+                });
+                error(format!("p0: {}\n", i));
+            });
+        }
+        drop(tx);
+
+        assert_eq!(rx.try_recv(), Err(Empty));
+        error(format!("{:?}\n{:?}\n", pool0, pool1));
+        pool0.join();
+        error(format!("pool0.join() complete =-= {:?}", pool1));
+        pool1.join();
+        error("pool1.join() complete\n".into());
+        assert_eq!(rx.iter().fold(0, |acc, i| acc + i), 0+1+2+3+4+5+6+7);
+    }
+
+    #[test]
+    fn test_empty_pool() {
+        // Joining an empty pool must return imminently
+        let pool = ThreadPool::new(4);
+
+        pool.join();
+
+        assert!(true);
+    }
+
+    #[test]
+    fn test_no_fun_or_joy() {
+        // What happens when you keep adding jobs after a join
+
+        fn sleepy_function() {
+            sleep(Duration::from_secs(6));
+        }
+
+        let pool = ThreadPool::new_with_name("no fun or joy".into(), 8);
+
+        pool.execute(sleepy_function);
+
+        let p_t = pool.clone();
+        thread::spawn(move || {
+            (0..23).map(|_| p_t.execute(sleepy_function)).count();
+        });
+
+        pool.join();
     }
 }
