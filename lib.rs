@@ -186,23 +186,19 @@ impl ThreadPool {
     /// # Examples
     ///
     /// ```rust
-    /// use std::sync::mpsc::sync_channel;
     /// use std::thread;
     /// use threadpool::ThreadPool;
     ///
-    /// let (tx, rx) = sync_channel(0);
     /// let mut pool = ThreadPool::new_with_name("worker".into(), 2);
     /// for _ in 0..2 {
-    ///     let tx = tx.clone();
-    ///     pool.execute(move || {
-    ///         let name = thread::current().name().unwrap().to_owned();
-    ///         tx.send(name).unwrap();
+    ///     pool.execute(|| {
+    ///         assert_eq!(
+    ///             thread::current().name(),
+    ///             Some("worker")
+    ///         );
     ///     });
     /// }
-    ///
-    /// for thread_name in rx.iter().take(2) {
-    ///     assert_eq!("worker", thread_name);
-    /// }
+    /// pool.join();
     /// ```
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
