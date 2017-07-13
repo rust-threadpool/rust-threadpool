@@ -351,6 +351,55 @@ impl ThreadPool {
             }
         }
     }
+
+    /// Returns a guard object that will block the current thread until the
+    /// pool as soon as the gard gets out of scope.
+    ///
+    /// This method has to be called on every `ThreadPool` instance induvidually.
+    ///
+    /// # Warning
+    ///
+    /// Creating or moving a `JoinOnDrop` inside its own pool will cause a dealock.
+    ///
+    /// # Example
+    ///
+    /// The function `do_work_in_parallel` uses the `join_on_drop` feature to
+    /// ensure all the work has completet when it returns.
+    ///
+    /// ```
+    /// use threadpool::{ThreadPool, JoinOnDrop};
+    /// use std::sync::Arc;
+    /// use std::sync::atomic::AtomicUsize;
+    /// use std::sync::atomic::Ordering::Relaxed;
+    ///
+    /// fn do_work_in_parallel(evens: &Arc<AtomicUsize>, odds: &Arc<AtomicUsize>) {
+    ///     let pool = ThreadPool::new(2).join_on_drop();
+    ///     (0..8).map(|i| {
+    ///                 let (evens, odds) = (evens.clone(), odds.clone());
+    ///                 pool.execute(move || {
+    ///                     if i % 2 == 0 {
+    ///                         evens.fetch_add(1, Relaxed);
+    ///                     } else {
+    ///                         odds.fetch_add(1, Relaxed);
+    ///                     }
+    ///                 });
+    ///             })
+    ///             // we use .count() here to run the iterator
+    ///             .count();
+    /// }
+    ///
+    /// let evens = Arc::new(AtomicUsize::new(0));
+    /// let odds  = Arc::new(AtomicUsize::new(0));
+    ///
+    /// do_work_in_parallel(&evens, &odds);
+    /// assert_eq!(4, evens.load(Relaxed));
+    /// assert_eq!(4, odds.load(Relaxed));
+    /// ```
+    pub fn join_on_drop(self) -> JoinOnDrop {
+        JoinOnDrop {
+            pool: self,
+        }
+    }
 }
 
 
@@ -408,6 +457,26 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
         })
         .unwrap();
 }
+
+
+
+pub struct JoinOnDrop {
+    pool: ThreadPool,
+}
+
+impl Drop for JoinOnDrop {
+    fn drop(&mut self) {
+        self.pool.join();
+    }
+}
+
+impl std::ops::Deref for JoinOnDrop {
+    type Target = ThreadPool;
+    fn deref(&self) -> &Self::Target {
+        &self.pool
+    }
+}
+
 
 #[cfg(test)]
 mod test {
@@ -778,5 +847,19 @@ mod test {
         });
 
         pool.join();
+    }
+
+    #[test]
+    fn test_join_guard() {
+        let pool = ThreadPool::new(4);
+
+        pool.execute(|| sleep(Duration::from_secs(5)));
+
+        {
+            let pool = pool.clone().join_on_drop();
+            assert_eq!(1, pool.queued_count() + pool.active_count());
+        }
+
+        assert_eq!(0, pool.queued_count() + pool.active_count());
     }
 }
