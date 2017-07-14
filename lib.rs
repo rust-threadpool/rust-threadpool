@@ -276,17 +276,17 @@ impl ThreadPool {
     /// use std::time::Duration;
     /// use std::thread::sleep;
     ///
-    /// let num_threads = 10;
-    /// let pool = ThreadPool::new(num_threads);
-    /// for _ in 0..num_threads {
+    /// let pool = ThreadPool::new(4);
+    /// for _ in 0..10 {
     ///     pool.execute(move || {
-    ///         sleep(Duration::from_secs(5));
+    ///         sleep(Duration::from_secs(100));
     ///     });
     /// }
     ///
     /// // wait for the pool to start working
     /// sleep(Duration::from_secs(1));
-    /// assert_eq!(pool.active_count(), num_threads);
+    ///
+    /// assert_eq!(4, pool.active_count());
     /// ```
     pub fn active_count(&self) -> usize {
         self.shared_data.active_count.load(Ordering::SeqCst)
