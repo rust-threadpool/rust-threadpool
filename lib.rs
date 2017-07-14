@@ -414,8 +414,7 @@ impl ThreadPool {
         }
     }
 
-    /// Block the current thread until all jobs in the pool are completed.
-    /// Many threads can wait for a pool to finish concurrently.
+    /// Block the current thread until all jobs in the pool have been executed.
     ///
     /// ```
     /// use threadpool::ThreadPool;
