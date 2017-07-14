@@ -252,10 +252,10 @@ impl ThreadPool {
     /// use threadpool::ThreadPool;
     ///
     /// let pool = ThreadPool::new(2);
-    /// pool.execute(|| println("hello"));
-    /// pool.execute(|| println("world"));
-    /// pool.execute(|| println("foo"));
-    /// pool.execute(|| println("bar"));
+    /// pool.execute(|| println!("hello"));
+    /// pool.execute(|| println!("world"));
+    /// pool.execute(|| println!("foo"));
+    /// pool.execute(|| println!("bar"));
     /// pool.join();
     /// ```
     pub fn execute<F>(&self, job: F)
