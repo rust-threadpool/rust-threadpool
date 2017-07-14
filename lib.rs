@@ -292,7 +292,19 @@ impl ThreadPool {
         self.shared_data.active_count.load(Ordering::SeqCst)
     }
 
-    /// Returns the number of created threads
+    /// Returns the maximum number of threads the pool will execute at once.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let mut pool = ThreadPool::new(4);
+    /// assert_eq!(4, pool.max_count());
+    ///
+    /// pool.set_num_threads(8);
+    /// assert_eq!(8, pool.max_count());
+    /// ```
     pub fn max_count(&self) -> usize {
         self.shared_data.max_thread_count.load(Ordering::Relaxed)
     }
