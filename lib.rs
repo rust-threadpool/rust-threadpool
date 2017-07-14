@@ -167,7 +167,7 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    /// Spawns a new thread pool with `num_threads` threads.
+    /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
     ///
     /// # Panics
     ///
@@ -186,8 +186,8 @@ impl ThreadPool {
         ThreadPool::new_pool(None, num_threads)
     }
 
-    /// Spawns a new thread pool with `num_threads` threads. Each thread will have the
-    /// [name][thread name] `name`.
+    /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
+    /// Each thread will have the [name][thread name] `name`.
     ///
     /// # Panics
     ///
