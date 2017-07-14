@@ -268,9 +268,7 @@ impl ThreadPool {
     ///     });
     /// }
     ///
-    /// // wait for the pool to start working
-    /// sleep(Duration::from_secs(1));
-    ///
+    /// sleep(Duration::from_secs(1)); // wait for threads to start
     /// assert_eq!(8, pool.queued_count());
     /// ```
     pub fn queued_count(&self) -> usize {
@@ -293,9 +291,7 @@ impl ThreadPool {
     ///     });
     /// }
     ///
-    /// // wait for the pool to start working
-    /// sleep(Duration::from_secs(1));
-    ///
+    /// sleep(Duration::from_secs(1)); // wait for threads to start
     /// assert_eq!(4, pool.active_count());
     /// ```
     pub fn active_count(&self) -> usize {
