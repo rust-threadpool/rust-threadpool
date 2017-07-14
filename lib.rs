@@ -245,6 +245,21 @@ impl ThreadPool {
     }
 
     /// Executes the function `job` on a thread in the pool.
+    ///
+    /// # Examples
+    ///
+    /// Execute four jobs on a thread pool that can run two jobs concurrently:
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let pool = ThreadPool::new(2);
+    /// pool.execute(|| println("hello"));
+    /// pool.execute(|| println("world"));
+    /// pool.execute(|| println("foo"));
+    /// pool.execute(|| println("bar"));
+    /// pool.join();
+    /// ```
     pub fn execute<F>(&self, job: F)
         where F: FnOnce() + Send + 'static
     {
