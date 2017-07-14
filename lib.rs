@@ -242,7 +242,7 @@ impl ThreadPool {
         self.jobs.send(Box::new(job)).expect("ThreadPool::execute unable to send job into queue.");
     }
 
-    /// Returns the number of accepted jobs
+    /// Returns the number of jobs waiting to executed in the pool.
     ///
     /// # Examples
     ///
