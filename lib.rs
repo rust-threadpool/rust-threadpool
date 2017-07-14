@@ -313,7 +313,7 @@ impl ThreadPool {
         self.shared_data.active_count.load(Ordering::SeqCst)
     }
 
-    /// Returns the maximum number of threads the pool will execute at once.
+    /// Returns the maximum number of threads the pool will execute concurrently.
     ///
     /// # Examples
     ///
