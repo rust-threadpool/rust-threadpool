@@ -243,6 +243,26 @@ impl ThreadPool {
     }
 
     /// Returns the number of accepted jobs
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let pool = ThreadPool::new(2);
+    /// for _ in 0..10 {
+    ///     pool.execute(|| {
+    ///         sleep(Duration::from_secs(100));
+    ///     });
+    /// }
+    ///
+    /// // wait for the pool to start working
+    /// sleep(Duration::from_secs(1));
+    ///
+    /// assert_eq!(8, pool.queued_count());
+    /// ```
     pub fn queued_count(&self) -> usize {
         self.shared_data.queued_count.load(Ordering::Relaxed)
     }
