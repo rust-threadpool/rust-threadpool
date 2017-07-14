@@ -304,15 +304,17 @@ impl ThreadPool {
     /// ```
     /// use threadpool::ThreadPool;
     ///
-    /// let num_threads = 10;
-    /// let pool = ThreadPool::new(num_threads);
-    /// for _ in 0..num_threads {
+    /// let pool = ThreadPool::new(4);
+    /// for n in 0..10 {
     ///     pool.execute(move || {
-    ///         panic!()
+    ///         if n % 2 == 0 {
+    ///             panic!()
+    ///         }
     ///     });
     /// }
     /// pool.join();
-    /// assert_eq!(pool.panic_count(), num_threads);
+    ///
+    /// assert_eq!(5, pool.panic_count());
     /// ```
     pub fn panic_count(&self) -> usize {
         self.shared_data.panic_count.load(Ordering::Relaxed)
