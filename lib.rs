@@ -189,7 +189,7 @@ impl ThreadPool {
     /// use std::thread;
     /// use threadpool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_name("worker".into(), 2);
+    /// let mut pool = ThreadPool::with_name("worker".into(), 2);
     /// for _ in 0..2 {
     ///     pool.execute(|| {
     ///         assert_eq!(
@@ -202,8 +202,14 @@ impl ThreadPool {
     /// ```
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
-    pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
+    pub fn with_name(name: String, num_threads: usize) -> ThreadPool {
         ThreadPool::new_pool(Some(name), num_threads)
+    }
+
+    #[inline(always)]
+    #[deprecated]
+    pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
+        ThreadPool::with_name(name, num_threads)
     }
 
     #[inline]
@@ -629,7 +635,7 @@ mod test {
     #[test]
     fn test_name() {
         let name = "test";
-        let mut pool = ThreadPool::new_with_name(name.to_owned(), 2);
+        let mut pool = ThreadPool::with_name(name.to_owned(), 2);
         let (tx, rx) = sync_channel(0);
 
         // initial thread should share the name "test"
@@ -667,7 +673,7 @@ mod test {
         let debug = format!("{:?}", pool);
         assert_eq!(debug, "ThreadPool { name: None, queued_count: 0, active_count: 0, max_count: 4 }");
 
-        let pool = ThreadPool::new_with_name("hello".into(), 4);
+        let pool = ThreadPool::with_name("hello".into(), 4);
         let debug = format!("{:?}", pool);
         assert_eq!(debug, "ThreadPool { name: Some(\"hello\"), queued_count: 0, active_count: 0, max_count: 4 }");
 
@@ -682,7 +688,7 @@ mod test {
     
     #[test]
     fn test_repeate_join() {
-        let pool = ThreadPool::new_with_name("repeate join test".into(), 8);
+        let pool = ThreadPool::with_name("repeate join test".into(), 8);
         let test_count = Arc::new(AtomicUsize::new(0));
 
         for _ in 0..42 {
@@ -720,8 +726,8 @@ mod test {
             //stderr.write(&_s.as_bytes()).is_ok();
         }
 
-        let pool0 = ThreadPool::new_with_name("multi join pool0".into(), 4);
-        let pool1 = ThreadPool::new_with_name("multi join pool1".into(), 4);
+        let pool0 = ThreadPool::with_name("multi join pool0".into(), 4);
+        let pool1 = ThreadPool::with_name("multi join pool1".into(), 4);
         let (tx, rx) = channel();
 
         for i in 0..8 {
@@ -768,7 +774,7 @@ mod test {
             sleep(Duration::from_secs(6));
         }
 
-        let pool = ThreadPool::new_with_name("no fun or joy".into(), 8);
+        let pool = ThreadPool::with_name("no fun or joy".into(), 8);
 
         pool.execute(sleepy_function);
 
