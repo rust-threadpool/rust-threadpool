@@ -172,6 +172,16 @@ impl ThreadPool {
     /// # Panics
     ///
     /// This function will panic if `num_threads` is 0.
+    ///
+    /// # Examples
+    ///
+    /// Create a new thread pool capable of executing four jobs concurrently:
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let pool = ThreadPool::new(4);
+    /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
         ThreadPool::new_pool(None, num_threads)
     }
