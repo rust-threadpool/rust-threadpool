@@ -356,6 +356,9 @@ impl ThreadPool {
 }
 
 
+/// Create a thread pool with one thread per CPU.
+/// On machines with hyperthreading,
+/// this will create one thread per hyperthread.
 impl Default for ThreadPool {
   fn default() -> Self {
     ThreadPool::new(num_cpus::get())
