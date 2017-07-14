@@ -189,7 +189,7 @@ impl ThreadPool {
     /// use std::thread;
     /// use threadpool::ThreadPool;
     ///
-    /// let mut pool = ThreadPool::new_with_name("worker".into(), 2);
+    /// let pool = ThreadPool::new_with_name("worker".into(), 2);
     /// for _ in 0..2 {
     ///     pool.execute(|| {
     ///         assert_eq!(
