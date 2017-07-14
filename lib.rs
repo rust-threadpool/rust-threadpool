@@ -355,6 +355,39 @@ impl ThreadPool {
     /// # Panics
     ///
     /// This function will panic if `num_threads` is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::time::Duration;
+    /// use std::thread::sleep;
+    ///
+    /// let mut pool = ThreadPool::new(4);
+    /// for _ in 0..10 {
+    ///     pool.execute(move || {
+    ///         sleep(Duration::from_secs(100));
+    ///     });
+    /// }
+    ///
+    /// sleep(Duration::from_secs(1)); // wait for threads to start
+    /// assert_eq!(4, pool.active_count());
+    /// assert_eq!(6, pool.queued_count());
+    ///
+    /// // Increase thread capacity of the pool
+    /// pool.set_num_threads(8);
+    ///
+    /// sleep(Duration::from_secs(1)); // wait for new threads to start
+    /// assert_eq!(8, pool.active_count());
+    /// assert_eq!(2, pool.queued_count());
+    ///
+    /// // Decrease thread capacity of the pool
+    /// // No active threads are killed
+    /// pool.set_num_threads(4);
+    ///
+    /// assert_eq!(8, pool.active_count());
+    /// assert_eq!(2, pool.queued_count());
+    /// ```
     pub fn set_num_threads(&mut self, num_threads: usize) {
         assert!(num_threads >= 1);
         let prev_num_threads = self.shared_data.max_thread_count.swap(num_threads, Ordering::Release);
