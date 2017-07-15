@@ -515,21 +515,17 @@ impl std::hash::Hash for ThreadPool {
     /// let a = ThreadPool::new(2);
     /// let b = ThreadPool::new(2);
     ///
-    /// let mut hasher = DefaultHasher::new();
-    /// a.hash(&mut hasher);
-    /// let hash_a_0 = hasher.finish();
+    /// fn hash_treadpool(pool: &ThreadPool) -> u64 {
+    ///     let mut hasher = DefaultHasher::new();
+    ///     pool.hash(&mut hasher);
+    ///     hasher.finish()
+    /// }
     ///
-    /// let mut hasher = DefaultHasher::new();
-    /// a.hash(&mut hasher);
-    /// let hash_a_1 = hasher.finish();
+    /// let hash_a_0 = hash_treadpool(&a);
+    /// let hash_a_1 = hash_treadpool(&a);
     ///
-    /// let mut hasher = DefaultHasher::new();
-    /// b.hash(&mut hasher);
-    /// let hash_b_0 = hasher.finish();
-    ///
-    /// let mut hasher = DefaultHasher::new();
-    /// b.hash(&mut hasher);
-    /// let hash_b_1 = hasher.finish();
+    /// let hash_b_0 = hash_treadpool(&b);
+    /// let hash_b_1 = hash_treadpool(&b);
     ///
     /// assert_eq!(hash_a_0, hash_a_1);
     /// assert_eq!(hash_b_0, hash_b_1);
