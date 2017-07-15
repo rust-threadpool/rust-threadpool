@@ -504,7 +504,44 @@ impl PartialEq for ThreadPool {
 }
 impl Eq for ThreadPool { }
 
-
+impl std::hash::Hash for ThreadPool {
+    /// Hashes the pointer to the shared data
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::hash::{Hash, Hasher};
+    /// use std::collections::hash_map::DefaultHasher;
+    ///
+    /// let a = ThreadPool::new(2);
+    /// let b = ThreadPool::new(2);
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// a.hash(&mut hasher);
+    /// let hash_a_0 = hasher.finish();
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// a.hash(&mut hasher);
+    /// let hash_a_1 = hasher.finish();
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// b.hash(&mut hasher);
+    /// let hash_b_0 = hasher.finish();
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// b.hash(&mut hasher);
+    /// let hash_b_1 = hasher.finish();
+    ///
+    /// assert_eq!(hash_a_0, hash_a_1);
+    /// assert_eq!(hash_b_0, hash_b_1);
+    ///
+    /// assert_ne!(hash_a_0, hash_b_0);
+    /// assert_ne!(hash_b_0, hash_a_0);
+    /// ```
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let ptr: &ThreadPoolSharedData = &*self.shared_data;
+        state.write_usize(ptr as *const ThreadPoolSharedData as usize);
+    }
+}
 
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
