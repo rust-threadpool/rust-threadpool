@@ -483,6 +483,29 @@ impl fmt::Debug for ThreadPool {
     }
 }
 
+impl PartialEq for ThreadPool {
+    /// Check if you are working with the same pool
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let a = ThreadPool::new(2);
+    /// let b = ThreadPool::new(2);
+    ///
+    /// assert_eq!(a, a);
+    /// assert_eq!(b, b);
+    ///
+    /// assert_ne!(a, b);
+    /// assert_ne!(b, a);
+    /// ```
+    fn eq(&self, other: &ThreadPool) -> bool {
+        Arc::ptr_eq(&self.shared_data, &other.shared_data)
+    }
+}
+impl Eq for ThreadPool { }
+
+
+
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
