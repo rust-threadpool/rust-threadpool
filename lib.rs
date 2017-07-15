@@ -499,7 +499,11 @@ impl PartialEq for ThreadPool {
     /// assert_ne!(b, a);
     /// ```
     fn eq(&self, other: &ThreadPool) -> bool {
-        Arc::ptr_eq(&self.shared_data, &other.shared_data)
+        let a: &ThreadPoolSharedData = &*self.shared_data;
+        let b: &ThreadPoolSharedData = &*other.shared_data;
+        a as *const ThreadPoolSharedData == b as *const ThreadPoolSharedData
+        // with rust 1.17 and late:
+        // Arc::ptr_eq(&self.shared_data, &other.shared_data)
     }
 }
 impl Eq for ThreadPool { }
