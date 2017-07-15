@@ -22,7 +22,7 @@ extern crate threadpool;
 
 ## Minimal requirements
 
-This crate requires Rust >= 1.9.0
+This crate requires Rust >= 1.12.0
 
 ## Similar libraries
 
