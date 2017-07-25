@@ -341,6 +341,7 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// for n in 0..10 {
     ///     pool.execute(move || {
+    ///         // simulate a panic
     ///         if n % 2 == 0 {
     ///             panic!()
     ///         }
