@@ -417,6 +417,14 @@ impl ThreadPool {
 
     /// Block the current thread until all jobs in the pool have been executed.
     ///
+    /// Calling `join` on an empty pool will cause an immediate return.
+    /// `join` may be called from multiple threads concurrently.
+    ///
+    /// Calling `join` from a thread within the pool will cause a deadlock. This
+    /// behavior is considered safe.
+    ///
+    /// # Examples
+    ///
     /// ```
     /// use threadpool::ThreadPool;
     /// use std::sync::Arc;
