@@ -50,6 +50,8 @@ branches:
     # Release tags
     - /^v\d+\.\d+\.\d+.*$/
     - master
+    - staging
+    - trying
 
 notifications:
   - provider: Email
