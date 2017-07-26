@@ -1,5 +1,10 @@
 # Changes
 
+## 1.4.1
+
+* [Introduce `with_name`, deprecate `new_with_name`](https://github.com/frewsxcv/rust-threadpool/pull/73)
+* [Documentation improvements](https://github.com/frewsxcv/rust-threadpool/pull/71)
+
 ## 1.4.0
 
 * [Implementation of the `join` operation](https://github.com/frewsxcv/rust-threadpool/pull/63)
