@@ -78,6 +78,8 @@
 //! assert_eq!(an_atomic.load(Ordering::SeqCst), 23);
 //! ```
 
+extern crate num_cpus;
+
 use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex, Condvar};
@@ -457,6 +459,16 @@ impl ThreadPool {
             }
         }
     }
+}
+
+
+/// Create a thread pool with one thread per CPU.
+/// On machines with hyperthreading,
+/// this will create one thread per hyperthread.
+impl Default for ThreadPool {
+  fn default() -> Self {
+    ThreadPool::new(num_cpus::get())
+  }
 }
 
 

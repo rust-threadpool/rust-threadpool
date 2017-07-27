@@ -13,5 +13,8 @@ A thread pool for running a number of jobs on a fixed set of worker threads.
 """
 categories = ["concurrency"]
 
+[dependencies]
+num_cpus = "1.6"
+
 [lib]
 path = "lib.rs"
