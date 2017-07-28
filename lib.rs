@@ -31,7 +31,7 @@
 //! for _ in 0..n_jobs {
 //!     let tx = tx.clone();
 //!     pool.execute(move|| {
-//!         tx.send(1).unwrap();
+//!         tx.send(1).expect("channel will be there waiting for the pool");
 //!     });
 //! }
 //!
@@ -149,7 +149,9 @@ impl ThreadPoolSharedData {
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
         if !self.has_work() {
-            *self.empty_trigger.lock().unwrap();
+            *self.empty_trigger
+                 .lock()
+                 .expect("Unable to notify all joining threads");
             self.empty_condvar.notify_all();
         }
     }
