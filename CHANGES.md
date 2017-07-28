@@ -1,5 +1,9 @@
 # Changes
 
+## 1.5.0
+
+* [Implement `Default` for `ThreadPool` use 'num_cpus' crate.](https://github.com/frewsxcv/rust-threadpool/pull/72)
+
 ## 1.4.1
 
 * [Introduce `with_name`, deprecate `new_with_name`](https://github.com/frewsxcv/rust-threadpool/pull/73)
