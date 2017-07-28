@@ -987,4 +987,51 @@ mod test {
 
         assert_eq!(h0, h1);
     }
+
+    #[test]
+    fn test_hashset() {
+        use std::collections::HashSet;
+
+        let mut pools = HashSet::new();
+
+        let a = ThreadPool::new(2);
+        let b = ThreadPool::new(2);
+        let c = ThreadPool::new(2);
+
+        pools.insert(a.clone());
+        pools.insert(b.clone());
+        pools.insert(c.clone());
+        pools.insert(a.clone());
+        pools.insert(b.clone());
+        pools.insert(c.clone());
+
+        assert_eq!(3, pools.len());
+
+        drop(a);
+        drop(b);
+        drop(c);
+
+        let (tx, rx) = channel();
+        let sum = Arc::new(AtomicUsize::new(0));
+        for pool in pools.iter() {
+            for _ in 0..10 {
+                let tx = tx.clone();
+                let sum = sum.clone();
+                pool.execute(move || {
+                    sleep(Duration::from_secs(1));
+                    sum.fetch_add(1, Ordering::Relaxed);
+                    tx.send(1).unwrap();
+                });
+            }
+        }
+
+        for pool in pools {
+            pool.join();
+        }
+        assert_eq!(30, sum.load(Ordering::Relaxed));
+
+        drop(tx);
+        let sum = rx.iter().fold(0, |acc, i| acc + i);
+        assert_eq!(30, sum);
+    }
 }
