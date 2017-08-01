@@ -218,8 +218,9 @@ impl ThreadPool {
         ThreadPool::new_pool(Some(name), num_threads)
     }
 
+    /// **Deprecated: Use `ThreadPool::with_name`**
     #[inline(always)]
-    #[deprecated]
+    #[deprecated(since = "1.4.0", note = "use ThreadPool::with_name")]
     pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
         ThreadPool::with_name(name, num_threads)
     }
