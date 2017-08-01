@@ -58,7 +58,7 @@
 //!
 //! assert!(n_jobs <= n_workers, "too many jobs, will deadlock");
 //!
-//! // create a barrier that wait all jobs plus the starter thread
+//! // create a barrier that waits for all jobs plus the starter thread
 //! let barrier = Arc::new(Barrier::new(n_jobs + 1));
 //! for _ in 0..n_jobs {
 //!     let barrier = barrier.clone();
@@ -111,7 +111,7 @@ impl<'a> Sentinel<'a> {
         }
     }
 
-    // Cancel and destroy this sentinel.
+    /// Cancel and destroy this sentinel.
     fn cancel(mut self) {
         self.active = false;
     }
