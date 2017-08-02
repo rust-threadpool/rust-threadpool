@@ -31,7 +31,7 @@
 //! for _ in 0..n_jobs {
 //!     let tx = tx.clone();
 //!     pool.execute(move|| {
-//!         tx.send(1).unwrap();
+//!         tx.send(1).expect("channel will be there waiting for the pool");
 //!     });
 //! }
 //!
@@ -58,7 +58,7 @@
 //!
 //! assert!(n_jobs <= n_workers, "too many jobs, will deadlock");
 //!
-//! // create a barrier that wait all jobs plus the starter thread
+//! // create a barrier that waits for all jobs plus the starter thread
 //! let barrier = Arc::new(Barrier::new(n_jobs + 1));
 //! for _ in 0..n_jobs {
 //!     let barrier = barrier.clone();
@@ -111,7 +111,7 @@ impl<'a> Sentinel<'a> {
         }
     }
 
-    // Cancel and destroy this sentinel.
+    /// Cancel and destroy this sentinel.
     fn cancel(mut self) {
         self.active = false;
     }
@@ -149,7 +149,9 @@ impl ThreadPoolSharedData {
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
         if !self.has_work() {
-            *self.empty_trigger.lock().unwrap();
+            *self.empty_trigger
+                 .lock()
+                 .expect("Unable to notify all joining threads");
             self.empty_condvar.notify_all();
         }
     }
@@ -216,8 +218,9 @@ impl ThreadPool {
         ThreadPool::new_pool(Some(name), num_threads)
     }
 
+    /// **Deprecated: Use `ThreadPool::with_name`**
     #[inline(always)]
-    #[deprecated]
+    #[deprecated(since = "1.4.0", note = "use ThreadPool::with_name")]
     pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
         ThreadPool::with_name(name, num_threads)
     }
