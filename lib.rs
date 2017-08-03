@@ -486,6 +486,66 @@ impl fmt::Debug for ThreadPool {
     }
 }
 
+impl PartialEq for ThreadPool {
+    /// Check if you are working with the same pool
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let a = ThreadPool::new(2);
+    /// let b = ThreadPool::new(2);
+    ///
+    /// assert_eq!(a, a);
+    /// assert_eq!(b, b);
+    ///
+    /// assert_ne!(a, b);
+    /// assert_ne!(b, a);
+    /// ```
+    fn eq(&self, other: &ThreadPool) -> bool {
+        let a: &ThreadPoolSharedData = &*self.shared_data;
+        let b: &ThreadPoolSharedData = &*other.shared_data;
+        a as *const ThreadPoolSharedData == b as *const ThreadPoolSharedData
+        // with rust 1.17 and late:
+        // Arc::ptr_eq(&self.shared_data, &other.shared_data)
+    }
+}
+impl Eq for ThreadPool { }
+
+impl std::hash::Hash for ThreadPool {
+    /// Hashes the pointer to the shared data
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::hash::{Hash, Hasher};
+    /// use std::collections::hash_map::DefaultHasher;
+    ///
+    /// let a = ThreadPool::new(2);
+    /// let b = ThreadPool::new(2);
+    ///
+    /// fn hash_treadpool(pool: &ThreadPool) -> u64 {
+    ///     let mut hasher = DefaultHasher::new();
+    ///     pool.hash(&mut hasher);
+    ///     hasher.finish()
+    /// }
+    ///
+    /// let hash_a_0 = hash_treadpool(&a);
+    /// let hash_a_1 = hash_treadpool(&a);
+    ///
+    /// let hash_b_0 = hash_treadpool(&b);
+    /// let hash_b_1 = hash_treadpool(&b);
+    ///
+    /// assert_eq!(hash_a_0, hash_a_1);
+    /// assert_eq!(hash_b_0, hash_b_1);
+    ///
+    /// assert_ne!(hash_a_0, hash_b_0);
+    /// assert_ne!(hash_b_0, hash_a_0);
+    /// ```
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let ptr: &ThreadPoolSharedData = &*self.shared_data;
+        state.write_usize(ptr as *const ThreadPoolSharedData as usize);
+    }
+}
+
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
@@ -903,5 +963,78 @@ mod test {
         });
 
         pool.join();
+    }
+
+    #[test]
+    fn test_cloned_eq() {
+        let a = ThreadPool::new(2);
+
+        assert_eq!(a, a.clone());
+    }
+
+    #[test]
+    fn test_cloned_hash() {
+        use std::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+
+        let a = ThreadPool::new(2);
+
+        let mut h = DefaultHasher::new();
+        a.hash(&mut h);
+        let h0 = h.finish();
+
+        let mut h = DefaultHasher::new();
+        a.clone().hash(&mut h);
+        let h1 = h.finish();
+
+
+        assert_eq!(h0, h1);
+    }
+
+    #[test]
+    fn test_hashset() {
+        use std::collections::HashSet;
+
+        let mut pools = HashSet::new();
+
+        let a = ThreadPool::new(2);
+        let b = ThreadPool::new(2);
+        let c = ThreadPool::new(2);
+
+        pools.insert(a.clone());
+        pools.insert(b.clone());
+        pools.insert(c.clone());
+        pools.insert(a.clone());
+        pools.insert(b.clone());
+        pools.insert(c.clone());
+
+        assert_eq!(3, pools.len());
+
+        drop(a);
+        drop(b);
+        drop(c);
+
+        let (tx, rx) = channel();
+        let sum = Arc::new(AtomicUsize::new(0));
+        for pool in pools.iter() {
+            for _ in 0..10 {
+                let tx = tx.clone();
+                let sum = sum.clone();
+                pool.execute(move || {
+                    sleep(Duration::from_secs(1));
+                    sum.fetch_add(1, Ordering::Relaxed);
+                    tx.send(1).unwrap();
+                });
+            }
+        }
+
+        for pool in pools {
+            pool.join();
+        }
+        assert_eq!(30, sum.load(Ordering::Relaxed));
+
+        drop(tx);
+        let sum = rx.iter().fold(0, |acc, i| acc + i);
+        assert_eq!(30, sum);
     }
 }

@@ -1,5 +1,10 @@
 # Changes
 
+## unreleased
+
+* [Increase the minimal version to rustc 1.13.0](https://github.com/frewsxcv/rust-threadpool/pull/74)
+* [Common traits PartialEq, Eq and Hash](https://github.com/frewsxcv/rust-threadpool/pull/74)
+
 ## 1.5.0
 
 * [Implement `Default` for `ThreadPool` use 'num_cpus' crate.](https://github.com/frewsxcv/rust-threadpool/pull/72)
