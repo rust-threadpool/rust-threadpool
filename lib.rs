@@ -158,7 +158,6 @@ impl ThreadPoolSharedData {
 }
 
 /// Abstraction of a thread pool for basic parallelism.
-#[derive(Clone)]
 pub struct ThreadPool {
     // How the threadpool communicates with subthreads.
     //
@@ -460,6 +459,78 @@ impl ThreadPool {
             while self.shared_data.has_work() {
                 lock = self.shared_data.empty_condvar.wait(lock).unwrap();
             }
+        }
+    }
+}
+
+impl Clone for ThreadPool {
+    /// Cloning a pool will create a new handle to the pool.
+    /// The behavior is similar to [Arc](https://doc.rust-lang.org/stable/std/sync/struct.Arc.html).
+    ///
+    /// We could for example [`join`](#method.join) a pool from multiple
+    /// threads or submit jobs from multiple threads concurrently.
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    /// use std::thread;
+    /// use std::sync::mpsc::channel;
+    ///
+    /// let pool = ThreadPool::with_name("clone example".into(), 2);
+    ///
+    /// for i in 0..42 {
+    ///     pool.execute(move || {
+    ///         println!("hello from task #{}", i);
+    ///     });
+    /// }
+    ///
+    /// let t0 = {
+    ///     let pool = pool.clone();
+    ///     thread::spawn(move || {
+    ///         // wait for the first batch of tasks to finish
+    ///         pool.join();
+    ///
+    ///         let (tx, rx) = channel();
+    ///         for i in 0..42 {
+    ///             let tx = tx.clone();
+    ///             pool.execute(move || {
+    ///                 tx.send(i).expect("channel will be waiting");
+    ///             });
+    ///         }
+    ///         drop(tx);
+    ///         rx.iter().fold(0, |accumulator, element| accumulator + element)
+    ///     })
+    /// };
+    /// let t1 = {
+    ///     let pool = pool.clone();
+    ///     thread::spawn(move || {
+    ///         // wait for the first batch of tasks to finish
+    ///         pool.join();
+    ///
+    ///         let (tx, rx) = channel();
+    ///         for i in 1..12 {
+    ///             let tx = tx.clone();
+    ///             pool.execute(move || {
+    ///                 tx.send(i).expect("channel will be waiting");
+    ///             });
+    ///         }
+    ///         drop(tx);
+    ///         rx.iter().fold(1, |accumulator, element| accumulator * element)
+    ///     })
+    /// };
+    ///
+    /// assert_eq!(
+    ///     861,
+    ///     t0.join().expect("thread 0 will return after calculating additions")
+    /// );
+    /// assert_eq!(
+    ///     39916800,
+    ///     t1.join().expect("thread 1 will return after calculating multiplications")
+    /// );
+    /// ```
+    fn clone(&self) -> ThreadPool {
+        ThreadPool {
+            jobs: self.jobs.clone(),
+            shared_data: self.shared_data.clone(),
         }
     }
 }
