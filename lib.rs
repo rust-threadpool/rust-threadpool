@@ -904,4 +904,22 @@ mod test {
 
         pool.join();
     }
+
+    #[test]
+    fn test_sync_shared_data() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<super::ThreadPoolSharedData>();
+    }
+
+    #[test]
+    fn test_send_shared_data() {
+        fn assert_send<T: Send>() {}
+        assert_send::<super::ThreadPoolSharedData>();
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<ThreadPool>();
+    }
 }
