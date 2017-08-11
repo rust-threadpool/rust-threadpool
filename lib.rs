@@ -149,9 +149,9 @@ impl ThreadPoolSharedData {
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
         if !self.has_work() {
-            *self.empty_trigger
-                 .lock()
-                 .expect("Unable to notify all joining threads");
+            *self.empty_trigger.lock().expect(
+                "Unable to notify all joining threads",
+            );
             self.empty_condvar.notify_all();
         }
     }
@@ -273,9 +273,9 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         self.shared_data.queued_count.fetch_add(1, Ordering::SeqCst);
-        self.jobs
-            .send(Box::new(job))
-            .expect("ThreadPool::execute unable to send job into queue.");
+        self.jobs.send(Box::new(job)).expect(
+            "ThreadPool::execute unable to send job into queue.",
+        );
     }
 
     /// Returns the number of jobs waiting to executed in the pool.
@@ -513,9 +513,9 @@ impl Clone for ThreadPool {
 /// On machines with hyperthreading,
 /// this will create one thread per hyperthread.
 impl Default for ThreadPool {
-  fn default() -> Self {
-    ThreadPool::new(num_cpus::get())
-  }
+    fn default() -> Self {
+        ThreadPool::new(num_cpus::get())
+    }
 }
 
 
@@ -554,7 +554,7 @@ impl PartialEq for ThreadPool {
         // Arc::ptr_eq(&self.shared_data, &other.shared_data)
     }
 }
-impl Eq for ThreadPool { }
+impl Eq for ThreadPool {}
 
 
 
@@ -579,10 +579,9 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
                 let message = {
                     // Only lock jobs for the time it takes
                     // to get a job, not run it.
-                    let lock = shared_data
-                        .job_receiver
-                        .lock()
-                        .expect("Worker thread unable to lock job_receiver");
+                    let lock = shared_data.job_receiver.lock().expect(
+                        "Worker thread unable to lock job_receiver",
+                    );
                     lock.recv()
                 };
 
@@ -976,16 +975,14 @@ mod test {
 
         pool.join();
     }
-    
+
     #[test]
     fn test_clone() {
         let pool = ThreadPool::with_name("clone example".into(), 2);
 
         // This batch of jobs will occupy the pool for some time
         for _ in 0..6 {
-            pool.execute(move || {
-                sleep(Duration::from_secs(2));
-            });
+            pool.execute(move || { sleep(Duration::from_secs(2)); });
         }
 
         // The following jobs will be inserted into the pool in a random fashion
@@ -998,12 +995,13 @@ mod test {
                 let (tx, rx) = channel();
                 for i in 0..42 {
                     let tx = tx.clone();
-                    pool.execute(move || {
-                        tx.send(i).expect("channel will be waiting");
-                    });
+                    pool.execute(move || { tx.send(i).expect("channel will be waiting"); });
                 }
                 drop(tx);
-                rx.iter().fold(0, |accumulator, element| accumulator + element)
+                rx.iter().fold(
+                    0,
+                    |accumulator, element| accumulator + element,
+                )
             })
         };
         let t1 = {
@@ -1015,22 +1013,27 @@ mod test {
                 let (tx, rx) = channel();
                 for i in 1..12 {
                     let tx = tx.clone();
-                    pool.execute(move || {
-                        tx.send(i).expect("channel will be waiting");
-                    });
+                    pool.execute(move || { tx.send(i).expect("channel will be waiting"); });
                 }
                 drop(tx);
-                rx.iter().fold(1, |accumulator, element| accumulator * element)
+                rx.iter().fold(
+                    1,
+                    |accumulator, element| accumulator * element,
+                )
             })
         };
 
         assert_eq!(
             861,
-            t0.join().expect("thread 0 will return after calculating additions")
+            t0.join().expect(
+                "thread 0 will return after calculating additions",
+            )
         );
         assert_eq!(
             39916800,
-            t1.join().expect("thread 1 will return after calculating multiplications")
+            t1.join().expect(
+                "thread 1 will return after calculating multiplications",
+            )
         );
     }
 
