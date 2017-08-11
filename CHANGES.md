@@ -1,5 +1,9 @@
 # Changes
 
+## 1.6.0
+
+* [Implement `PartialEq` and `Eq` for `ThreadPool`](https://github.com/rust-threadpool/rust-threadpool/pull/81)
+
 ## 1.5.0
 
 * [Implement `Default` for `ThreadPool` use 'num_cpus' crate.](https://github.com/rust-threadpool/rust-threadpool/pull/72)
