@@ -1049,6 +1049,7 @@ mod test {
     fn test_send() {
         fn assert_send<T: Send>() {}
         assert_send::<ThreadPool>();
+    }
 
     #[test]
     fn test_cloned_eq() {
