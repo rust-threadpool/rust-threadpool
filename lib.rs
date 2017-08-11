@@ -1057,23 +1057,4 @@ mod test {
 
         assert_eq!(a, a.clone());
     }
-
-    #[test]
-    fn test_cloned_hash() {
-        use std::hash::{Hash, Hasher};
-        use std::collections::hash_map::DefaultHasher;
-
-        let a = ThreadPool::new(2);
-
-        let mut h = DefaultHasher::new();
-        a.hash(&mut h);
-        let h0 = h.finish();
-
-        let mut h = DefaultHasher::new();
-        a.clone().hash(&mut h);
-        let h1 = h.finish();
-
-
-        assert_eq!(h0, h1);
-    }
 }
