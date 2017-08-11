@@ -15,6 +15,3 @@ categories = ["concurrency"]
 
 [dependencies]
 num_cpus = "1.6"
-
-[lib]
-path = "lib.rs"
