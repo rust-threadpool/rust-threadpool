@@ -542,8 +542,9 @@ impl PartialEq for ThreadPool {
     /// assert_eq!(a, a);
     /// assert_eq!(b, b);
     ///
-    /// assert_ne!(a, b);
-    /// assert_ne!(b, a);
+    /// # // TODO: change this to assert_ne in the future
+    /// assert!(a != b);
+    /// assert!(b != a);
     /// ```
     fn eq(&self, other: &ThreadPool) -> bool {
         let a: &ThreadPoolSharedData = &*self.shared_data;
