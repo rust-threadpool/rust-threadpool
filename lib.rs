@@ -530,6 +530,34 @@ impl fmt::Debug for ThreadPool {
     }
 }
 
+impl PartialEq for ThreadPool {
+    /// Check if you are working with the same pool
+    ///
+    /// ```
+    /// use threadpool::ThreadPool;
+    ///
+    /// let a = ThreadPool::new(2);
+    /// let b = ThreadPool::new(2);
+    ///
+    /// assert_eq!(a, a);
+    /// assert_eq!(b, b);
+    ///
+    /// # // TODO: change this to assert_ne in the future
+    /// assert!(a != b);
+    /// assert!(b != a);
+    /// ```
+    fn eq(&self, other: &ThreadPool) -> bool {
+        let a: &ThreadPoolSharedData = &*self.shared_data;
+        let b: &ThreadPoolSharedData = &*other.shared_data;
+        a as *const ThreadPoolSharedData == b as *const ThreadPoolSharedData
+        // with rust 1.17 and late:
+        // Arc::ptr_eq(&self.shared_data, &other.shared_data)
+    }
+}
+impl Eq for ThreadPool { }
+
+
+
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = Builder::new();
@@ -1022,5 +1050,12 @@ mod test {
     fn test_send() {
         fn assert_send<T: Send>() {}
         assert_send::<ThreadPool>();
+    }
+
+    #[test]
+    fn test_cloned_eq() {
+        let a = ThreadPool::new(2);
+
+        assert_eq!(a, a.clone());
     }
 }
