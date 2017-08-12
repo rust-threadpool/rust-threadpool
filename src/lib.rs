@@ -84,7 +84,8 @@ use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::{Builder, panicking};
+use std::thread::Builder as ThreadBuilder;
+use std::thread::panicking;
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -127,6 +128,45 @@ impl<'a> Drop for Sentinel<'a> {
             self.shared_data.no_work_notify_all();
             spawn_in_pool(self.shared_data.clone())
         }
+    }
+}
+
+pub struct Builder {
+    max_threads_count: Option<usize>,
+    thread_name: Option<String>,
+    stack_size: Option<usize>,
+}
+
+impl Builder {
+    /// defaults to num_cpus if available, or else four
+    pub fn new() -> Builder {
+        Builder {
+            max_num_threads: None,
+            thread_name: None,
+            stack_size: None,
+        }
+    }
+
+    pub fn max_num_threads(mut self, num_threads: usize) -> Builder {
+        self.max_num_threads = Some(num_threads);
+        self
+    }
+
+    pub fn thread_name(mut self, name: String) -> Builder {
+        self.thread_name = Some(name);
+        self
+    }
+
+    pub fn stack_size(mut self, size: usize) -> Builder {
+        self.stack_size = Some(size);
+        self
+    }
+
+    pub fn finish(self) -> ThreadPool {
+        ThreadPool::new_pool(
+            self.thread_name,
+            self.max_num_threads.unwrap_or_else(|| num_cpus::get()),
+        )
     }
 }
 
@@ -560,7 +600,7 @@ impl Eq for ThreadPool {}
 
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
-    let mut builder = Builder::new();
+    let mut builder = ThreadBuilder::new();
     if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
     }
