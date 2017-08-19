@@ -134,7 +134,7 @@ impl<'a> Drop for Sentinel<'a> {
 pub struct Builder {
     max_num_threads: Option<usize>,
     thread_name: Option<String>,
-    stack_size: Option<usize>,
+    thread_stack_size: Option<usize>,
 }
 
 impl Builder {
@@ -143,7 +143,7 @@ impl Builder {
         Builder {
             max_num_threads: None,
             thread_name: None,
-            stack_size: None,
+            thread_stack_size: None,
         }
     }
 
@@ -153,13 +153,45 @@ impl Builder {
         self
     }
 
+    /// Set the thread name for each of the threads spawned by the built `ThreadPool`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let pool = threadpool::Builder::new()
+    ///     .thread_name("foo".into())
+    ///     .finish();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         assert_eq!(thread::current().name(), Some("foo"));
+    ///     })
+    /// }
+    /// ```
     pub fn thread_name(mut self, name: String) -> Builder {
         self.thread_name = Some(name);
         self
     }
 
-    pub fn stack_size(mut self, size: usize) -> Builder {
-        self.stack_size = Some(size);
+    /// Set the stack size (in bytes) for each of the threads spawned by the built `ThreadPool`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let pool = threadpool::Builder::new()
+    ///     .thread_stack_size(4_000_000)
+    ///     .finish();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         // threads will have a 4 MB stack size
+    ///     })
+    /// }
+    /// ```
+    pub fn thread_stack_size(mut self, size: usize) -> Builder {
+        self.thread_stack_size = Some(size);
         self
     }
 
@@ -167,7 +199,7 @@ impl Builder {
         ThreadPool::new_pool(
             self.thread_name,
             self.max_num_threads.unwrap_or_else(|| num_cpus::get()),
-            self.stack_size,
+            self.thread_stack_size,
         )
     }
 }
