@@ -262,11 +262,31 @@ impl Builder {
     ///     .finish();
     /// ```
     pub fn finish(self) -> ThreadPool {
-        ThreadPool::new_pool(
-            self.thread_name,
-            self.max_num_threads.unwrap_or_else(|| num_cpus::get()),
-            self.thread_stack_size,
-        )
+        let (tx, rx) = channel::<Thunk<'static>>();
+
+        let max_num_threads = self.max_num_threads.unwrap_or_else(|| num_cpus::get());
+
+        let shared_data = Arc::new(ThreadPoolSharedData {
+            name: self.thread_name,
+            job_receiver: Mutex::new(rx),
+            empty_condvar: Condvar::new(),
+            empty_trigger: Mutex::new(()),
+            queued_count: AtomicUsize::new(0),
+            active_count: AtomicUsize::new(0),
+            max_thread_count: AtomicUsize::new(max_num_threads),
+            panic_count: AtomicUsize::new(0),
+            stack_size: self.thread_stack_size,
+        });
+
+        // Threadpool threads
+        for _ in 0..max_num_threads {
+            spawn_in_pool(shared_data.clone());
+        }
+
+        ThreadPool {
+            jobs: tx,
+            shared_data: shared_data,
+        }
     }
 }
 
@@ -325,7 +345,9 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(None, num_threads, None)
+        Builder::new()
+            .max_num_threads(num_threads)
+            .finish()
     }
 
     /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
@@ -355,43 +377,17 @@ impl ThreadPool {
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
     pub fn with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(Some(name), num_threads, None)
+        Builder::new()
+            .max_num_threads(num_threads)
+            .thread_name(name)
+            .finish()
     }
 
     /// **Deprecated: Use `ThreadPool::with_name`**
     #[inline(always)]
     #[deprecated(since = "1.4.0", note = "use ThreadPool::with_name")]
     pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::with_name(name, num_threads)
-    }
-
-    #[inline]
-    fn new_pool(name: Option<String>, num_threads: usize, stack_size: Option<usize>) -> ThreadPool {
-        assert!(num_threads >= 1);
-
-        let (tx, rx) = channel::<Thunk<'static>>();
-
-        let shared_data = Arc::new(ThreadPoolSharedData {
-            name: name,
-            job_receiver: Mutex::new(rx),
-            empty_condvar: Condvar::new(),
-            empty_trigger: Mutex::new(()),
-            queued_count: AtomicUsize::new(0),
-            active_count: AtomicUsize::new(0),
-            max_thread_count: AtomicUsize::new(num_threads),
-            panic_count: AtomicUsize::new(0),
-            stack_size: stack_size,
-        });
-
-        // Threadpool threads
-        for _ in 0..num_threads {
-            spawn_in_pool(shared_data.clone());
-        }
-
-        ThreadPool {
-            jobs: tx,
-            shared_data: shared_data,
-        }
+        Self::with_name(name, num_threads)
     }
 
     /// Executes the function `job` on a thread in the pool.
