@@ -131,6 +131,28 @@ impl<'a> Drop for Sentinel<'a> {
     }
 }
 
+/// `ThreadPool` factory, which can be used in order to configure the properties of the
+/// `ThreadPool`.
+///
+/// The three configuration options available:
+///
+/// * `max_num_threads`: maximum number of threads that will be alive at any given moment by the
+///   built `ThreadPool`
+/// * `thread_name`: thread name for each of the threads spawned by the built `ThreadPool`
+/// * `thread_stack_size`: stack size (in bytes) for each of the threads spawned by the built
+///   `ThreadPool`.
+///
+/// # Examples
+///
+/// Build a `ThreadPool` that uses a maximum of eight threads simultaneously and each thread has
+/// a 8 MB stack size:
+///
+/// ```
+/// let pool = threadpool::Builder::new()
+///     .max_num_threads(8)
+///     .thread_stack_size(8_000_000)
+///     .finish();
+/// ```
 pub struct Builder {
     max_num_threads: Option<usize>,
     thread_name: Option<String>,
@@ -138,7 +160,13 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// defaults to num_cpus if available, or else four
+    /// Initiate a new `Builder`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = threadpool::Builder::new();
+    /// ```
     pub fn new() -> Builder {
         Builder {
             max_num_threads: None,
@@ -152,7 +180,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// No more than eight threads will be alive at once for this pool:
+    /// No more than eight threads will be alive simultaneously for this pool:
     ///
     /// ```
     /// use std::thread;
@@ -218,6 +246,16 @@ impl Builder {
         self
     }
 
+    /// Finalize the `Builder` and build the `ThreadPool`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let pool = threadpool::Builder::new()
+    ///     .max_num_threads(8)
+    ///     .thread_stack_size(4_000_000)
+    ///     .finish();
+    /// ```
     pub fn finish(self) -> ThreadPool {
         ThreadPool::new_pool(
             self.thread_name,
