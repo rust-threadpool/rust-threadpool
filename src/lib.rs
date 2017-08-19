@@ -84,8 +84,7 @@ use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::Builder as ThreadBuilder;
-use std::thread::panicking;
+use std::thread;
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -122,7 +121,7 @@ impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
             self.shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
-            if panicking() {
+            if thread::panicking() {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
             }
             self.shared_data.no_work_notify_all();
@@ -696,7 +695,7 @@ impl Eq for ThreadPool {}
 
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
-    let mut builder = ThreadBuilder::new();
+    let mut builder = thread::Builder::new();
     if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
     }
