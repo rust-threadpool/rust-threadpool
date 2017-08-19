@@ -345,9 +345,7 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
-        Builder::new()
-            .max_num_threads(num_threads)
-            .finish()
+        Builder::new().max_num_threads(num_threads).finish()
     }
 
     /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
