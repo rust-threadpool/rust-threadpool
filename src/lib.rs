@@ -178,6 +178,10 @@ impl Builder {
     /// Set the maximum number of threads that will be alive at any given moment by the built
     /// `ThreadPool`.
     ///
+    /// # Panics
+    ///
+    /// This method will panic if `num_threads` is 0.
+    ///
     /// # Examples
     ///
     /// No more than eight threads will be alive simultaneously for this pool:
@@ -196,6 +200,7 @@ impl Builder {
     /// }
     /// ```
     pub fn max_num_threads(mut self, num_threads: usize) -> Builder {
+        assert!(num_threads > 0);
         self.max_num_threads = Some(num_threads);
         self
     }
