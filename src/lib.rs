@@ -132,7 +132,7 @@ impl<'a> Drop for Sentinel<'a> {
 }
 
 pub struct Builder {
-    max_threads_count: Option<usize>,
+    max_num_threads: Option<usize>,
     thread_name: Option<String>,
     stack_size: Option<usize>,
 }
@@ -147,6 +147,7 @@ impl Builder {
         }
     }
 
+    // todo: decide name
     pub fn max_num_threads(mut self, num_threads: usize) -> Builder {
         self.max_num_threads = Some(num_threads);
         self
@@ -166,6 +167,7 @@ impl Builder {
         ThreadPool::new_pool(
             self.thread_name,
             self.max_num_threads.unwrap_or_else(|| num_cpus::get()),
+            self.stack_size,
         )
     }
 }
@@ -179,6 +181,7 @@ struct ThreadPoolSharedData {
     active_count: AtomicUsize,
     max_thread_count: AtomicUsize,
     panic_count: AtomicUsize,
+    stack_size: Option<usize>,
 }
 
 impl ThreadPoolSharedData {
@@ -224,7 +227,7 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(None, num_threads)
+        ThreadPool::new_pool(None, num_threads, None)
     }
 
     /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
@@ -254,7 +257,7 @@ impl ThreadPool {
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
     pub fn with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(Some(name), num_threads)
+        ThreadPool::new_pool(Some(name), num_threads, None)
     }
 
     /// **Deprecated: Use `ThreadPool::with_name`**
@@ -265,7 +268,7 @@ impl ThreadPool {
     }
 
     #[inline]
-    fn new_pool(name: Option<String>, num_threads: usize) -> ThreadPool {
+    fn new_pool(name: Option<String>, num_threads: usize, stack_size: Option<usize>) -> ThreadPool {
         assert!(num_threads >= 1);
 
         let (tx, rx) = channel::<Thunk<'static>>();
@@ -279,6 +282,7 @@ impl ThreadPool {
             active_count: AtomicUsize::new(0),
             max_thread_count: AtomicUsize::new(num_threads),
             panic_count: AtomicUsize::new(0),
+            stack_size: stack_size,
         });
 
         // Threadpool threads
@@ -603,6 +607,9 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
     let mut builder = ThreadBuilder::new();
     if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
+    }
+    if let Some(ref stack_size) = shared_data.stack_size {
+        builder = builder.stack_size(stack_size.to_owned());
     }
     builder
         .spawn(move || {
