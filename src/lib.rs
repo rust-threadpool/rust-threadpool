@@ -147,7 +147,26 @@ impl Builder {
         }
     }
 
-    // todo: decide name
+    /// Set the maximum number of threads that will be alive at any given moment by the built
+    /// `ThreadPool`.
+    ///
+    /// # Examples
+    ///
+    /// No more than eight threads will be alive at once for this pool:
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let pool = threadpool::Builder::new()
+    ///     .max_num_threads(8)
+    ///     .finish();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         println!("Hello from a worker thread!")
+    ///     })
+    /// }
+    /// ```
     pub fn max_num_threads(mut self, num_threads: usize) -> Builder {
         self.max_num_threads = Some(num_threads);
         self
@@ -156,6 +175,8 @@ impl Builder {
     /// Set the thread name for each of the threads spawned by the built `ThreadPool`.
     ///
     /// # Examples
+    ///
+    /// Each thread spawned by this pool will have the name "foo":
     ///
     /// ```
     /// use std::thread;
@@ -179,6 +200,8 @@ impl Builder {
     ///
     /// # Examples
     ///
+    /// Each thread spawned by this pool will have a 4 MB stack:
+    ///
     /// ```
     /// let pool = threadpool::Builder::new()
     ///     .thread_stack_size(4_000_000)
@@ -186,7 +209,7 @@ impl Builder {
     ///
     /// for _ in 0..100 {
     ///     pool.execute(|| {
-    ///         // threads will have a 4 MB stack size
+    ///         println!("This thread has a 4 MB stack size!").
     ///     })
     /// }
     /// ```
