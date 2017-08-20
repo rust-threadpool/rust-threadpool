@@ -135,8 +135,8 @@ impl<'a> Drop for Sentinel<'a> {
 ///
 /// The three configuration options available:
 ///
-/// * `max_num_threads`: maximum number of threads that will be alive at any given moment by the
-///   built `ThreadPool`
+/// * `num_threads`: maximum number of threads that will be alive at any given moment by the built
+///   `ThreadPool`
 /// * `thread_name`: thread name for each of the threads spawned by the built `ThreadPool`
 /// * `thread_stack_size`: stack size (in bytes) for each of the threads spawned by the built
 ///   `ThreadPool`.
@@ -148,7 +148,7 @@ impl<'a> Drop for Sentinel<'a> {
 ///
 /// ```
 /// let pool = threadpool::Builder::new()
-///     .max_num_threads(8)
+///     .num_threads(8)
 ///     .thread_stack_size(8_000_000)
 ///     .finish();
 /// ```
@@ -174,8 +174,8 @@ impl Builder {
         }
     }
 
-    /// Set the maximum number of threads that will be alive at any given moment by the built
-    /// `ThreadPool`.
+    /// Set the maximum number of worker-threads that will be alive at any given moment by the built
+    /// `ThreadPool`. If not specified, defaults the number of threads to the number of CPUs.
     ///
     /// # Panics
     ///
@@ -198,13 +198,14 @@ impl Builder {
     ///     })
     /// }
     /// ```
-    pub fn max_num_threads(mut self, num_threads: usize) -> Builder {
+    pub fn num_threads(mut self, num_threads: usize) -> Builder {
         assert!(num_threads > 0);
         self.max_num_threads = Some(num_threads);
         self
     }
 
-    /// Set the thread name for each of the threads spawned by the built `ThreadPool`.
+    /// Set the thread name for each of the threads spawned by the built `ThreadPool`. If not
+    /// specified, threads spawned by the thread pool will be unnamed.
     ///
     /// # Examples
     ///
@@ -228,7 +229,11 @@ impl Builder {
         self
     }
 
-    /// Set the stack size (in bytes) for each of the threads spawned by the built `ThreadPool`.
+    /// Set the stack size (in bytes) for each of the threads spawned by the built `ThreadPool`. If
+    /// not specified, threads spawned by the threadpool will have a stack size [as specified in the
+    /// `std::thread` documentation][thread].
+    ///
+    /// [thread]: https://doc.rust-lang.org/nightly/std/thread/index.html#stack-size
     ///
     /// # Examples
     ///
@@ -263,7 +268,7 @@ impl Builder {
     pub fn finish(self) -> ThreadPool {
         let (tx, rx) = channel::<Thunk<'static>>();
 
-        let max_num_threads = self.max_num_threads.unwrap_or_else(|| num_cpus::get());
+        let max_num_threads = self.max_num_threads.unwrap_or_else(num_cpus::get);
 
         let shared_data = Arc::new(ThreadPoolSharedData {
             name: self.thread_name,
