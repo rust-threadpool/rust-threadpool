@@ -217,7 +217,7 @@ impl ThreadPool {
         ThreadPool::new_pool(Some(name), num_threads)
     }
 
-    /// **Deprecated: Use `ThreadPool::with_name`**
+    /// **Deprecated: Use [`ThreadPool::with_name`](#method.with_name)**
     #[inline(always)]
     #[deprecated(since = "1.4.0", note = "use ThreadPool::with_name")]
     pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
@@ -365,7 +365,7 @@ impl ThreadPool {
         self.shared_data.panic_count.load(Ordering::Relaxed)
     }
 
-    /// **Deprecated: Use `ThreadPool::set_num_threads`**
+    /// **Deprecated: Use [`ThreadPool::set_num_threads`](#method.set_num_threads)**
     #[deprecated(since = "1.3.0", note = "use ThreadPool::set_num_threads")]
     pub fn set_threads(&mut self, num_threads: usize) {
         self.set_num_threads(num_threads)
