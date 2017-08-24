@@ -11,7 +11,8 @@ documentation = "https://docs.rs/threadpool"
 description = """
 A thread pool for running a number of jobs on a fixed set of worker threads.
 """
-categories = ["concurrency"]
+keywords = ["threadpool", "thread", "pool", "threading", "parallelism"]
+categories = ["concurrency", "os"]
 
 [dependencies]
 num_cpus = "1.6"
