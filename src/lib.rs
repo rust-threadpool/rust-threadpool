@@ -130,20 +130,22 @@ impl<'a> Drop for Sentinel<'a> {
     }
 }
 
-/// `ThreadPool` factory, which can be used in order to configure the properties of the
-/// `ThreadPool`.
+/// [`ThreadPool`] factory, which can be used in order to configure the properties of the
+/// [`ThreadPool`].
 ///
 /// The three configuration options available:
 ///
 /// * `num_threads`: maximum number of threads that will be alive at any given moment by the built
-///   `ThreadPool`
-/// * `thread_name`: thread name for each of the threads spawned by the built `ThreadPool`
+///   [`ThreadPool`]
+/// * `thread_name`: thread name for each of the threads spawned by the built [`ThreadPool`]
 /// * `thread_stack_size`: stack size (in bytes) for each of the threads spawned by the built
-///   `ThreadPool`.
+///   [`ThreadPool`]
+///
+/// [`ThreadPool`]: struct.ThreadPool.html
 ///
 /// # Examples
 ///
-/// Build a `ThreadPool` that uses a maximum of eight threads simultaneously and each thread has
+/// Build a [`ThreadPool`] that uses a maximum of eight threads simultaneously and each thread has
 /// a 8 MB stack size:
 ///
 /// ```
@@ -159,7 +161,9 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// Initiate a new `Builder`.
+    /// Initiate a new [`Builder`].
+    ///
+    /// [`Builder`]: struct.Builder.html
     ///
     /// # Examples
     ///
@@ -175,7 +179,9 @@ impl Builder {
     }
 
     /// Set the maximum number of worker-threads that will be alive at any given moment by the built
-    /// `ThreadPool`. If not specified, defaults the number of threads to the number of CPUs.
+    /// [`ThreadPool`]. If not specified, defaults the number of threads to the number of CPUs.
+    ///
+    /// [`ThreadPool`]: struct.ThreadPool.html
     ///
     /// # Panics
     ///
@@ -204,8 +210,10 @@ impl Builder {
         self
     }
 
-    /// Set the thread name for each of the threads spawned by the built `ThreadPool`. If not
+    /// Set the thread name for each of the threads spawned by the built [`ThreadPool`]. If not
     /// specified, threads spawned by the thread pool will be unnamed.
+    ///
+    /// [`ThreadPool`]: struct.ThreadPool.html
     ///
     /// # Examples
     ///
@@ -229,11 +237,12 @@ impl Builder {
         self
     }
 
-    /// Set the stack size (in bytes) for each of the threads spawned by the built `ThreadPool`. If
-    /// not specified, threads spawned by the threadpool will have a stack size [as specified in the
-    /// `std::thread` documentation][thread].
+    /// Set the stack size (in bytes) for each of the threads spawned by the built [`ThreadPool`].
+    /// If not specified, threads spawned by the threadpool will have a stack size [as specified in
+    /// the `std::thread` documentation][thread].
     ///
     /// [thread]: https://doc.rust-lang.org/nightly/std/thread/index.html#stack-size
+    /// [`ThreadPool`]: struct.ThreadPool.html
     ///
     /// # Examples
     ///
@@ -255,7 +264,10 @@ impl Builder {
         self
     }
 
-    /// Finalize the `Builder` and build the `ThreadPool`.
+    /// Finalize the [`Builder`] and build the [`ThreadPool`].
+    ///
+    /// [`Builder`]: struct.Builder.html
+    /// [`ThreadPool`]: struct.ThreadPool.html
     ///
     /// # Examples
     ///
