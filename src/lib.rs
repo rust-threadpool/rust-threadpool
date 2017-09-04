@@ -152,7 +152,7 @@ impl<'a> Drop for Sentinel<'a> {
 /// let pool = threadpool::Builder::new()
 ///     .num_threads(8)
 ///     .thread_stack_size(8_000_000)
-///     .finish();
+///     .build();
 /// ```
 pub struct Builder {
     num_threads: Option<usize>,
@@ -196,7 +196,7 @@ impl Builder {
     ///
     /// let pool = threadpool::Builder::new()
     ///     .num_threads(8)
-    ///     .finish();
+    ///     .build();
     ///
     /// for _ in 0..100 {
     ///     pool.execute(|| {
@@ -224,7 +224,7 @@ impl Builder {
     ///
     /// let pool = threadpool::Builder::new()
     ///     .thread_name("foo".into())
-    ///     .finish();
+    ///     .build();
     ///
     /// for _ in 0..100 {
     ///     pool.execute(|| {
@@ -251,7 +251,7 @@ impl Builder {
     /// ```
     /// let pool = threadpool::Builder::new()
     ///     .thread_stack_size(4_000_000)
-    ///     .finish();
+    ///     .build();
     ///
     /// for _ in 0..100 {
     ///     pool.execute(|| {
@@ -275,9 +275,9 @@ impl Builder {
     /// let pool = threadpool::Builder::new()
     ///     .num_threads(8)
     ///     .thread_stack_size(4_000_000)
-    ///     .finish();
+    ///     .build();
     /// ```
-    pub fn finish(self) -> ThreadPool {
+    pub fn build(self) -> ThreadPool {
         let (tx, rx) = channel::<Thunk<'static>>();
 
         let num_threads = self.num_threads.unwrap_or_else(num_cpus::get);
@@ -361,7 +361,7 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
-        Builder::new().num_threads(num_threads).finish()
+        Builder::new().num_threads(num_threads).build()
     }
 
     /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
@@ -394,7 +394,7 @@ impl ThreadPool {
         Builder::new()
             .num_threads(num_threads)
             .thread_name(name)
-            .finish()
+            .build()
     }
 
     /// **Deprecated: Use `ThreadPool::with_name`**
