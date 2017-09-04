@@ -154,6 +154,7 @@ impl<'a> Drop for Sentinel<'a> {
 ///     .thread_stack_size(8_000_000)
 ///     .build();
 /// ```
+#[derive(Clone)]
 pub struct Builder {
     num_threads: Option<usize>,
     thread_name: Option<String>,
