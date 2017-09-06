@@ -84,7 +84,7 @@ use std::fmt;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::{Arc, Mutex, Condvar};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::{Builder, panicking};
+use std::thread;
 
 trait FnBox {
     fn call_box(self: Box<Self>);
@@ -121,11 +121,188 @@ impl<'a> Drop for Sentinel<'a> {
     fn drop(&mut self) {
         if self.active {
             self.shared_data.active_count.fetch_sub(1, Ordering::SeqCst);
-            if panicking() {
+            if thread::panicking() {
                 self.shared_data.panic_count.fetch_add(1, Ordering::SeqCst);
             }
             self.shared_data.no_work_notify_all();
             spawn_in_pool(self.shared_data.clone())
+        }
+    }
+}
+
+/// [`ThreadPool`] factory, which can be used in order to configure the properties of the
+/// [`ThreadPool`].
+///
+/// The three configuration options available:
+///
+/// * `num_threads`: maximum number of threads that will be alive at any given moment by the built
+///   [`ThreadPool`]
+/// * `thread_name`: thread name for each of the threads spawned by the built [`ThreadPool`]
+/// * `thread_stack_size`: stack size (in bytes) for each of the threads spawned by the built
+///   [`ThreadPool`]
+///
+/// [`ThreadPool`]: struct.ThreadPool.html
+///
+/// # Examples
+///
+/// Build a [`ThreadPool`] that uses a maximum of eight threads simultaneously and each thread has
+/// a 8 MB stack size:
+///
+/// ```
+/// let pool = threadpool::Builder::new()
+///     .num_threads(8)
+///     .thread_stack_size(8_000_000)
+///     .build();
+/// ```
+#[derive(Clone, Default)]
+pub struct Builder {
+    num_threads: Option<usize>,
+    thread_name: Option<String>,
+    thread_stack_size: Option<usize>,
+}
+
+impl Builder {
+    /// Initiate a new [`Builder`].
+    ///
+    /// [`Builder`]: struct.Builder.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = threadpool::Builder::new();
+    /// ```
+    pub fn new() -> Builder {
+        Builder {
+            num_threads: None,
+            thread_name: None,
+            thread_stack_size: None,
+        }
+    }
+
+    /// Set the maximum number of worker-threads that will be alive at any given moment by the built
+    /// [`ThreadPool`]. If not specified, defaults the number of threads to the number of CPUs.
+    ///
+    /// [`ThreadPool`]: struct.ThreadPool.html
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `num_threads` is 0.
+    ///
+    /// # Examples
+    ///
+    /// No more than eight threads will be alive simultaneously for this pool:
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let pool = threadpool::Builder::new()
+    ///     .num_threads(8)
+    ///     .build();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         println!("Hello from a worker thread!")
+    ///     })
+    /// }
+    /// ```
+    pub fn num_threads(mut self, num_threads: usize) -> Builder {
+        assert!(num_threads > 0);
+        self.num_threads = Some(num_threads);
+        self
+    }
+
+    /// Set the thread name for each of the threads spawned by the built [`ThreadPool`]. If not
+    /// specified, threads spawned by the thread pool will be unnamed.
+    ///
+    /// [`ThreadPool`]: struct.ThreadPool.html
+    ///
+    /// # Examples
+    ///
+    /// Each thread spawned by this pool will have the name "foo":
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let pool = threadpool::Builder::new()
+    ///     .thread_name("foo".into())
+    ///     .build();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         assert_eq!(thread::current().name(), Some("foo"));
+    ///     })
+    /// }
+    /// ```
+    pub fn thread_name(mut self, name: String) -> Builder {
+        self.thread_name = Some(name);
+        self
+    }
+
+    /// Set the stack size (in bytes) for each of the threads spawned by the built [`ThreadPool`].
+    /// If not specified, threads spawned by the threadpool will have a stack size [as specified in
+    /// the `std::thread` documentation][thread].
+    ///
+    /// [thread]: https://doc.rust-lang.org/nightly/std/thread/index.html#stack-size
+    /// [`ThreadPool`]: struct.ThreadPool.html
+    ///
+    /// # Examples
+    ///
+    /// Each thread spawned by this pool will have a 4 MB stack:
+    ///
+    /// ```
+    /// let pool = threadpool::Builder::new()
+    ///     .thread_stack_size(4_000_000)
+    ///     .build();
+    ///
+    /// for _ in 0..100 {
+    ///     pool.execute(|| {
+    ///         println!("This thread has a 4 MB stack size!");
+    ///     })
+    /// }
+    /// ```
+    pub fn thread_stack_size(mut self, size: usize) -> Builder {
+        self.thread_stack_size = Some(size);
+        self
+    }
+
+    /// Finalize the [`Builder`] and build the [`ThreadPool`].
+    ///
+    /// [`Builder`]: struct.Builder.html
+    /// [`ThreadPool`]: struct.ThreadPool.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let pool = threadpool::Builder::new()
+    ///     .num_threads(8)
+    ///     .thread_stack_size(4_000_000)
+    ///     .build();
+    /// ```
+    pub fn build(self) -> ThreadPool {
+        let (tx, rx) = channel::<Thunk<'static>>();
+
+        let num_threads = self.num_threads.unwrap_or_else(num_cpus::get);
+
+        let shared_data = Arc::new(ThreadPoolSharedData {
+            name: self.thread_name,
+            job_receiver: Mutex::new(rx),
+            empty_condvar: Condvar::new(),
+            empty_trigger: Mutex::new(()),
+            queued_count: AtomicUsize::new(0),
+            active_count: AtomicUsize::new(0),
+            max_thread_count: AtomicUsize::new(num_threads),
+            panic_count: AtomicUsize::new(0),
+            stack_size: self.thread_stack_size,
+        });
+
+        // Threadpool threads
+        for _ in 0..num_threads {
+            spawn_in_pool(shared_data.clone());
+        }
+
+        ThreadPool {
+            jobs: tx,
+            shared_data: shared_data,
         }
     }
 }
@@ -139,6 +316,7 @@ struct ThreadPoolSharedData {
     active_count: AtomicUsize,
     max_thread_count: AtomicUsize,
     panic_count: AtomicUsize,
+    stack_size: Option<usize>,
 }
 
 impl ThreadPoolSharedData {
@@ -184,7 +362,7 @@ impl ThreadPool {
     /// let pool = ThreadPool::new(4);
     /// ```
     pub fn new(num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(None, num_threads)
+        Builder::new().num_threads(num_threads).build()
     }
 
     /// Creates a new thread pool capable of executing `num_threads` number of jobs concurrently.
@@ -214,42 +392,17 @@ impl ThreadPool {
     ///
     /// [thread name]: https://doc.rust-lang.org/std/thread/struct.Thread.html#method.name
     pub fn with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::new_pool(Some(name), num_threads)
+        Builder::new()
+            .num_threads(num_threads)
+            .thread_name(name)
+            .build()
     }
 
     /// **Deprecated: Use [`ThreadPool::with_name`](#method.with_name)**
     #[inline(always)]
     #[deprecated(since = "1.4.0", note = "use ThreadPool::with_name")]
     pub fn new_with_name(name: String, num_threads: usize) -> ThreadPool {
-        ThreadPool::with_name(name, num_threads)
-    }
-
-    #[inline]
-    fn new_pool(name: Option<String>, num_threads: usize) -> ThreadPool {
-        assert!(num_threads >= 1);
-
-        let (tx, rx) = channel::<Thunk<'static>>();
-
-        let shared_data = Arc::new(ThreadPoolSharedData {
-            name: name,
-            job_receiver: Mutex::new(rx),
-            empty_condvar: Condvar::new(),
-            empty_trigger: Mutex::new(()),
-            queued_count: AtomicUsize::new(0),
-            active_count: AtomicUsize::new(0),
-            max_thread_count: AtomicUsize::new(num_threads),
-            panic_count: AtomicUsize::new(0),
-        });
-
-        // Threadpool threads
-        for _ in 0..num_threads {
-            spawn_in_pool(shared_data.clone());
-        }
-
-        ThreadPool {
-            jobs: tx,
-            shared_data: shared_data,
-        }
+        Self::with_name(name, num_threads)
     }
 
     /// Executes the function `job` on a thread in the pool.
@@ -560,9 +713,12 @@ impl Eq for ThreadPool {}
 
 
 fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
-    let mut builder = Builder::new();
+    let mut builder = thread::Builder::new();
     if let Some(ref name) = shared_data.name {
         builder = builder.name(name.clone());
+    }
+    if let Some(ref stack_size) = shared_data.stack_size {
+        builder = builder.stack_size(stack_size.to_owned());
     }
     builder
         .spawn(move || {
