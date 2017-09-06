@@ -1,5 +1,11 @@
 # Changes
 
+## 1.7.0
+
+* [Introduce `threadpool::Builder`](https://github.com/rust-threadpool/rust-threadpool/pull/83)
+* [Add more hyperlinks to documentation](https://github.com/rust-threadpool/rust-threadpool/pull/87)
+* [Add keywords and categories to Cargo.toml](https://github.com/rust-threadpool/rust-threadpool/pull/88)
+
 ## 1.6.0
 
 * [Implement `PartialEq` and `Eq` for `ThreadPool`](https://github.com/rust-threadpool/rust-threadpool/pull/81)
