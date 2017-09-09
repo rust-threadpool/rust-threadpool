@@ -584,6 +584,9 @@ impl ThreadPool {
     ///
     /// Calling `join` on an empty pool will cause an immediate return.
     /// `join` may be called from multiple threads concurrently.
+    /// A `join` is an atomic point in time. All threads joining before the join
+    /// event will exit together even if the pool is processing new jobs by the
+    /// time they get scheduled.
     ///
     /// Calling `join` from a thread within the pool will cause a deadlock. This
     /// behavior is considered safe.
