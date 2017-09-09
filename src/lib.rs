@@ -607,11 +607,13 @@ impl ThreadPool {
     /// assert_eq!(42, test_count.load(Ordering::Relaxed));
     /// ```
     pub fn join(&self) {
+        if self.shared_data.has_work() == false {
+            return ();
+        }
+
+        let mut lock = self.shared_data.empty_trigger.lock().unwrap();
         while self.shared_data.has_work() {
-            let mut lock = self.shared_data.empty_trigger.lock().unwrap();
-            while self.shared_data.has_work() {
-                lock = self.shared_data.empty_condvar.wait(lock).unwrap();
-            }
+            lock = self.shared_data.empty_condvar.wait(lock).unwrap();
         }
     }
 }
