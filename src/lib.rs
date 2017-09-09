@@ -763,7 +763,7 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
 
 #[cfg(test)]
 mod test {
-    use super::ThreadPool;
+    use super::{ThreadPool, Builder};
     use std::sync::{Arc, Barrier};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc::{sync_channel, channel};
@@ -1216,5 +1216,82 @@ mod test {
         let a = ThreadPool::new(2);
 
         assert_eq!(a, a.clone());
+    }
+
+
+
+    #[test]
+    /// The scenario is joining threads should not be stuck once their wave
+    /// of joins has completed. So once one thread joining on a pool has
+    /// succeded other threads joining on the same pool must get out even if
+    /// the thread is used for other jobs while the first group is finishing
+    /// their join
+    fn test_join_wavesurfer() {
+        let n_cycles = 4;
+        let (tx, rx) = channel();
+        let builder = Builder::new().num_threads(4)
+                                    .thread_name("join wavesurfer".into());
+        let p_waiter = builder.clone().build();
+        let p_clock = builder.build();
+
+        let barrier = Arc::new(Barrier::new(3));
+        let wave_clock = Arc::new(AtomicUsize::new(0));
+        let clock_thread = {
+            let barrier = barrier.clone();
+            let wave_clock = wave_clock.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                for wave_num in 0..n_cycles {
+                    wave_clock.store(wave_num, Ordering::SeqCst);
+                    sleep(Duration::from_secs(1));
+                }
+            })
+        };
+
+        {
+            let barrier = barrier.clone();
+            p_clock.execute(move || { barrier.wait(); });
+        }
+        for i in 0..12 {
+            let p_clock = p_clock.clone();
+            let tx = tx.clone();
+            let wave_clock = wave_clock.clone();
+            p_waiter.execute(move || {
+                let now = wave_clock.load(Ordering::SeqCst);
+                p_clock.join();
+                // submit jobs for the second wave
+                p_clock.execute(|| sleep(Duration::from_secs(1)));
+                let clock = wave_clock.load(Ordering::SeqCst);
+                tx.send((now, clock, i)).unwrap();
+            });
+        }
+        println!("all scheduled at {}", wave_clock.load(Ordering::SeqCst));
+        barrier.wait();
+
+        p_clock.join();
+        //p_waiter.join();
+
+        drop(tx);
+        let mut hist = vec![0; n_cycles];
+        let mut data = vec![];
+        for (now, after, i) in rx.iter() {
+            let mut dur = after - now;
+            if dur >= n_cycles -1 {
+                dur = n_cycles -1;
+            }
+            hist[dur] += 1;
+
+            data.push((now, after, i));
+        }
+        for (i, n) in hist.iter().enumerate() {
+            println!("\t{}: {} {}", i, n, &*(0..*n).fold("".to_owned(), |s, _| s + "*"));
+        }
+        assert!(data.iter()
+                    .all(|&(cycle, stop, i)| {
+                        assert_eq!(cycle, stop, "{:?}", (cycle, stop, i));
+                        cycle == stop
+                    }));
+
+        clock_thread.join().unwrap();
     }
 }
