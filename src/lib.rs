@@ -1266,7 +1266,7 @@ mod test {
             p_clock.execute(move || {
                 barrier.wait();
                 // this sleep is for stabilisation on weaker platforms
-                sleep(Duration::from_millis(10));
+                sleep(Duration::from_millis(100));
             });
         }
 
