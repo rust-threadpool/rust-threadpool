@@ -619,11 +619,12 @@ impl ThreadPool {
         let generation = self.shared_data.join_generation.load(Ordering::SeqCst);
         let mut lock = self.shared_data.empty_trigger.lock().unwrap();
 
-        while generation == self.shared_data.join_generation.load(Ordering::Relaxed) &&
-                self.shared_data.has_work() {
+        while generation == self.shared_data.join_generation.load(Ordering::Relaxed)
+                && self.shared_data.has_work() {
             lock = self.shared_data.empty_condvar.wait(lock).unwrap();
         }
 
+        // increase generation if we are the first thread to come out of the loop
         self.shared_data.join_generation.compare_and_swap(generation, generation.wrapping_add(1), Ordering::SeqCst);
     }
 }
