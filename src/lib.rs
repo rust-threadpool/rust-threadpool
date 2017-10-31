@@ -612,6 +612,7 @@ impl ThreadPool {
     /// assert_eq!(42, test_count.load(Ordering::Relaxed));
     /// ```
     pub fn join(&self) {
+        // fast path requires no mutex
         if self.shared_data.has_work() == false {
             return ();
         }

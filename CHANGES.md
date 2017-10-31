@@ -1,5 +1,9 @@
 # Changes
 
+## 1.7.1
+
+* [Join waves](https://github.com/rust-threadpool/rust-threadpool/pull/89)
+
 ## 1.7.0
 
 * [Introduce `threadpool::Builder`](https://github.com/rust-threadpool/rust-threadpool/pull/83)
