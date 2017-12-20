@@ -43,7 +43,7 @@
 //! Keep in mind, if a barrier synchronizes more jobs than you have workers in the pool,
 //! you will end up with a [deadlock](https://en.wikipedia.org/wiki/Deadlock)
 //! at the barrier which is [not considered unsafe]
-//! (http://doc.rust-lang.org/reference.html#behavior-not-considered-unsafe).
+//! (https://doc.rust-lang.org/reference/behavior-not-considered-unsafe.html).
 //!
 //! ```
 //! use threadpool::ThreadPool;
