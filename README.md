@@ -26,6 +26,7 @@ This crate requires Rust >= 1.9.0
 
 ## Similar libraries
 
+* [rayon (`rayon::ThreadPool`)](https://docs.rs/rayon/*/rayon/struct.ThreadPool.html)
 * [rust-scoped-pool](http://github.com/reem/rust-scoped-pool)
 * [scoped-threadpool-rs](https://github.com/Kimundi/scoped-threadpool-rs)
 * [crossbeam](https://github.com/aturon/crossbeam)
