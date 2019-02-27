@@ -813,7 +813,7 @@ mod test {
         let mut pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..TEST_TASKS {
             pool.execute(move || {
-                1 + 1;
+                assert_eq!(1, 1);
             });
         }
         pool.set_num_threads(new_thread_amount);
