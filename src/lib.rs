@@ -75,7 +75,7 @@
 //!
 //! // wait for the threads to finish the work
 //! barrier.wait();
-//! assert_eq!(an_atomic.load(Ordering::SeqCst), 23);
+//! assert_eq!(an_atomic.load(Ordering::SeqCst), /* n_jobs = */ 23);
 //! ```
 
 extern crate num_cpus;
