@@ -22,7 +22,7 @@ extern crate threadpool;
 
 ## Minimal requirements
 
-This crate requires Rust >= 1.9.0
+This crate requires Rust >= 1.13.0
 
 ## Similar libraries
 
@@ -49,14 +49,14 @@ conditions.
 
 ## Development
 
-To install rust version 1.9.0 with [rustup](https://rustup.rs) execute this command:
+To install rust version 1.13.0 with [rustup](https://rustup.rs) execute this command:
 ```
-rustup install 1.9.0
+rustup install 1.13.0
 ```
 
-To run the tests with 1.9.0 use this command:
+To run the tests with 1.13.0 use this command:
 ```
-cargo +1.9.0 test
+cargo +1.13.0 test
 ```
 
 If you this fails with this error
