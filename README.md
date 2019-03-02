@@ -22,7 +22,7 @@ extern crate threadpool;
 
 ## Minimal requirements
 
-This crate requires Rust >= 1.9.0
+This crate requires Rust >= 1.13.0
 
 ## Similar libraries
 
@@ -46,3 +46,25 @@ Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in the work by you, as defined in the Apache-2.0
 license, shall be dual licensed as above, without any additional terms or
 conditions.
+
+## Development
+
+To install rust version 1.13.0 with [rustup](https://rustup.rs) execute this command:
+```
+rustup install 1.13.0
+```
+
+To run the tests with 1.13.0 use this command:
+```
+cargo +1.13.0 test
+```
+
+If you this fails with this error
+```
+warning: unused manifest key: package.categories
+error: failed to parse lock file at: /home/vp/rust/threadpool/Cargo.lock
+```
+which you can fix by removing the lock file:
+```
+rm Cargo.lock
+```

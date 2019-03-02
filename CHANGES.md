@@ -1,5 +1,9 @@
 # Changes
 
+## 1.8.0
+
+* [Raise minimal rustc version to 1.13.0](https://github.com/rust-threadpool/rust-threadpool/pull/99)
+
 ## 1.7.1
 
 * [Join waves](https://github.com/rust-threadpool/rust-threadpool/pull/89)
