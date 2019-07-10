@@ -66,12 +66,13 @@ To run the tests with 1.13.0 use this command:
 cargo +1.13.0 test
 ```
 
-If you this fails with this error
+If your build fails with this error:
 ```
 warning: unused manifest key: package.categories
 error: failed to parse lock file at: /home/vp/rust/threadpool/Cargo.lock
 ```
-which you can fix by removing the lock file:
+
+You can fix it by removing the lock file:
 ```
 rm Cargo.lock
 ```
