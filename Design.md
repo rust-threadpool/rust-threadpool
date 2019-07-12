@@ -26,10 +26,25 @@
 
 These examples are up for discussion.
 
+### Simpler construction
+
+Remove the need to import the `Builder` and `ThreadPool` structs unless to pass the objects around functions.
+Thereby cleaning up the code a bit.
+
+```rust
+// for rust 2015
+extern crate threadpool;
+
+let default_pool = threadpool::new().unwrap();
+let custom_pool = threadpool::builder()
+                    .set_thread_label("my worker")
+                    .build().unwrap();
+```
+
 ### Schedule new tasks on the go
 
 ```rust
-let pool = Builder::new().build().unwrap();
+let pool = threadpool::new().unwrap();
 let (sender, receiver) = channel();
 for o in 0..5 {
     let sender = sender.clone();
@@ -75,7 +90,7 @@ enum NumaOptions {
     SpreadNodes(Vec<usize>),
 }
 
-let pool = Builder::new()
+let pool = threadpool::builder()
             // existing functionality
             .set_stack_size(4096)
             // dis-/allows the use of the hyper thread cores: default = true
@@ -93,8 +108,8 @@ Enable this functionality with the crate feature flag `crossbeam`.
 An open question is whether or not it has to be enabled with one of these lines as well:
 
 ```rust
-let pool = Builder::new().build::<threadpool::Crossbeam>().unwrap();
-let pool: ThreadPool<threadpool::Crossbeam> = Builder::new().build().unwrap();
+let pool = threadpool::builder().build::<threadpool::Crossbeam>().unwrap();
+let pool: ThreadPool<threadpool::Crossbeam> = threadpool::new().unwrap();
 ```
 
 ### Shutdown operation
@@ -118,7 +133,7 @@ enum TaskLabels<F> {
     NewLabel(String, F),
 }
 
-let pool = Builder::new()
+let pool = threadpool::builder()
             .set_thread_label("Idle Workers")
             .build().unwrap();
 
@@ -146,7 +161,7 @@ Question: should the execute function return the generation?
 /// This GenerationId may in very rare cases wrap around
 struct Generation(usize);
 
-let pool = Builder::new().build().unwrap();
+let pool = threadpool::new().unwrap();
 
 // Assuming the same TaskLabels as before
 let generation_0 = pool.execute(|_| some_operations());
@@ -181,7 +196,7 @@ Aborting previous generations is fine.
 Question: Should the running tasks of `Generation(1)` be aborted on panic?
 
 ```rust
-let pool = Builder::new().build().unwrap();
+let pool = threadpool::new().unwrap();
 // generation is now 0 and normal tasks may be submitted
 
 let mut list = vec![1, 2];
