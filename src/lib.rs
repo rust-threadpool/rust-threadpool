@@ -234,6 +234,7 @@ impl Builder {
     ///
     /// ```
     /// use std::thread;
+    /// use std::time::Duration;
     ///
     /// let pool = threadpool::Builder::new()
     ///     .num_threads(1)
@@ -242,9 +243,9 @@ impl Builder {
     ///
     /// for _ in 0..2 {
     ///     pool.execute(|| {
-    ///         println!("Hello from a worker thread! I'm going to rest now...")
+    ///         println!("Hello from a worker thread! I'm going to rest now...");
     ///         thread::sleep(Duration::from_secs(10));
-    ///         println!("All done!")
+    ///         println!("All done!");
     ///     })
     /// }
     ///
