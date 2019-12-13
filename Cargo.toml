@@ -16,3 +16,4 @@ categories = ["concurrency", "os"]
 
 [dependencies]
 num_cpus = "1.6"
+crossbeam-channel = "0.4"
