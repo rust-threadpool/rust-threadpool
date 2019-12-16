@@ -2,7 +2,8 @@
 
 ## Requirements and Goals
 
-* Compatible with rust 1.13
+* Compatible with rust 1.34.2
+* Use `edition = 2018`
 * Unify wording of internal symbols and functions
 * Access to the pool handle from within the task
 * Optional support for crossbeam-channel?
