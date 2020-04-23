@@ -14,5 +14,13 @@ A thread pool for running a number of jobs on a fixed set of worker threads.
 keywords = ["threadpool", "thread", "pool", "threading", "parallelism"]
 categories = ["concurrency", "os"]
 
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "CHANGES.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+]
+
 [dependencies]
 num_cpus = "1.13"
