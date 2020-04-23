@@ -15,4 +15,4 @@ keywords = ["threadpool", "thread", "pool", "threading", "parallelism"]
 categories = ["concurrency", "os"]
 
 [dependencies]
-num_cpus = "1.6"
+num_cpus = "1.13"
