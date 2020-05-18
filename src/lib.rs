@@ -96,7 +96,7 @@ impl<F: FnOnce()> FnBox for F {
     }
 }
 
-type Thunk<'a> = Box<FnBox + Send + 'a>;
+type Thunk<'a> = Box<dyn FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
     shared_data: &'a Arc<ThreadPoolSharedData>,
@@ -930,7 +930,7 @@ mod test {
                     b1.wait();
                 }
 
-                tx.send(1).is_ok();
+                let _ = tx.send(1);
             });
         }
 
