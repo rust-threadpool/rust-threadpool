@@ -29,7 +29,7 @@ This crate requires Rust >= 1.13.0
 Rust [1.32.0](https://blog.rust-lang.org/2019/01/17/Rust-1.32.0.html) has switched from jemalloc to the operating systems allocator.
 While this enables more plattforms for some workloads this means some performance loss.
 
-To regain the performance consider enableing the [jemallocator crate](https://crates.io/crates/jemallocator).
+To regain the performance consider enabling the [jemallocator crate](https://crates.io/crates/jemallocator).
 
 ## Similar libraries
 
