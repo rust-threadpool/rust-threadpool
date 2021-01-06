@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2014 The Rust Project Developers
+// SPDX-FileCopyrightText: Corey Farwell <coreyf@rwell.org>
+// SPDX-FileCopyrightText: Stefan Schindler <dns2utf8@estada.ch>
+// SPDX-License-Identifier: Apache-2.0 OR MIT 
 // Copyright 2014 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
