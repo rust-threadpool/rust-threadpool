@@ -78,7 +78,7 @@
 //! assert_eq!(an_atomic.load(Ordering::SeqCst), /* n_jobs = */ 23);
 //! ```
 
-extern crate num_cpus;
+use num_cpus;
 
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -96,7 +96,7 @@ impl<F: FnOnce()> FnBox for F {
     }
 }
 
-type Thunk<'a> = Box<FnBox + Send + 'a>;
+type Thunk<'a> = Box<dyn FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
     shared_data: &'a Arc<ThreadPoolSharedData>,
@@ -691,7 +691,7 @@ impl Default for ThreadPool {
 }
 
 impl fmt::Debug for ThreadPool {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ThreadPool")
             .field("name", &self.shared_data.name)
             .field("queued_count", &self.queued_count())
@@ -930,7 +930,7 @@ mod test {
                     b1.wait();
                 }
 
-                tx.send(1).is_ok();
+                let _ = tx.send(1);
             });
         }
 
