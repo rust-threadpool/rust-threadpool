@@ -215,22 +215,16 @@ impl Builder {
         self
     }
 
-    /// Set the maximum number of pending jobs that can be queued to
-    /// the [`ThreadPool`]. Once the queue is full further calls will
-    /// block until slots become available. A `len` of 0 will always
-    /// block until a thread is available.  If not specified, defaults
-    /// to unlimited.
+    /// Set the maximum number of pending jobs that can be queued to the [`ThreadPool`]. Once the
+    /// queue is full further calls will block until slots become available. A `len` of 0 will
+    /// always block until a thread is available.  If not specified, defaults to unlimited.
     ///
     /// [`ThreadPool`]: struct.ThreadPool.html
     ///
-    /// # Panics
-    ///
-    /// This method will panic if `len` is less-than 0;
-    ///
     /// # Examples
     ///
-    /// With a single thread and a queue len of 1, the final execute
-    /// will have to wait until the first job finishes to be queued.
+    /// With a single thread and a queue len of 1, the final execute will have to wait until the
+    /// first job finishes to be queued.
     ///
     /// ```
     /// use std::thread;
@@ -326,11 +320,7 @@ impl Builder {
     ///     .build();
     /// ```
     pub fn build(self) -> ThreadPool {
-        let (tx, rx) = self.queue_len.map_or(
-            cbc::unbounded(),
-            |len| cbc::bounded(len)
-        );
-
+        let (tx, rx) = self.queue_len.map_or_else(cbc::unbounded, cbc::bounded);
         let num_threads = self.num_threads.unwrap_or_else(num_cpus::get);
 
         let shared_data = Arc::new(ThreadPoolSharedData {
@@ -1379,15 +1369,12 @@ mod test {
 
     #[test]
     fn test_bounded_pool() {
-        let pool = Builder::new()
-            .num_threads(1)
-            .queue_len(1)
-            .build();
+        let pool = Builder::new().num_threads(1).queue_len(1).build();
         let end = Arc::new(Barrier::new(2));
         let count = Arc::new(Mutex::new(0));
 
-        fn inc_wait(c: &Arc<Mutex<i64>>, val: i64, millis: i64) -> bool{
-            for _ in 0..millis/10 {
+        fn inc_wait(c: &Arc<Mutex<i64>>, val: i64, millis: i64) -> bool {
+            for _ in 0..millis / 10 {
                 {
                     let l = c.lock().unwrap();
                     if *l == val {
@@ -1431,8 +1418,7 @@ mod test {
         // Third attempt should block
         let c3 = count.clone();
         thread::spawn(move || {
-            pool.execute(move || {
-            } );
+            pool.execute(move || {});
             {
                 let mut c = c3.lock().unwrap();
                 *c += 1;

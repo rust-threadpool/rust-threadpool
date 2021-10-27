@@ -1,5 +1,4 @@
 [package]
-
 name = "threadpool"
 version = "1.8.1"
 authors = ["The Rust Project Developers", "Corey Farwell <coreyf@rwell.org>", "Stefan Schindler <dns2utf8@estada.ch>"]
