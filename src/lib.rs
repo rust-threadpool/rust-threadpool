@@ -82,9 +82,11 @@ use num_cpus;
 
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+
+mod channel_types;
+pub use channel_types::{ChannelReceiver, ChannelSender, ChannelType};
 
 #[cfg(test)]
 mod test;
@@ -110,8 +112,10 @@ pub fn auto_config() -> ThreadPool {
 /// ```
 /// let builder = threadpool::builder();
 /// ```
-pub const fn builder() -> Builder {
+pub fn builder() -> Builder {
     Builder {
+        channel_type: Default::default(),
+        channel_bound: None,
         num_workers: None,
         worker_name: None,
         thread_stack_size: None,
@@ -149,18 +153,6 @@ pub fn with_name<S: AsRef<str>>(name: S) -> ThreadPool {
     builder().worker_name(name).build()
 }
 */
-
-trait FnBox {
-    fn call_box(self: Box<Self>);
-}
-
-impl<F: FnOnce()> FnBox for F {
-    fn call_box(self: Box<F>) {
-        (*self)()
-    }
-}
-
-type Thunk<'a> = Box<dyn FnBox + Send + 'a>;
 
 struct Sentinel<'a> {
     shared_data: &'a Arc<ThreadPoolSharedData>,
@@ -220,12 +212,28 @@ impl<'a> Drop for Sentinel<'a> {
 /// ```
 #[derive(Clone, Default)]
 pub struct Builder {
+    channel_type: ChannelType,
+    channel_bound: Option<usize>,
     num_workers: Option<usize>,
     worker_name: Option<String>,
     thread_stack_size: Option<usize>,
 }
 
 impl Builder {
+    /// Specify the channel type for a specific `ThreadPool`
+    pub fn with(mut self, ct: ChannelType) -> Builder {
+        self.channel_type = ct;
+        self
+    }
+    /// Select the bound variant of the available channels
+    pub fn queue_size(mut self, len: usize) -> Builder {
+        if len == 0 {
+            self.channel_bound = None;
+        } else {
+            self.channel_bound = Some(len);
+        }
+        self
+    }
     /// Set the maximum number of worker-threads that will be alive at any given moment by the built
     /// [`ThreadPool`]. If not specified, defaults the number of threads to the number of CPUs.
     ///
@@ -280,9 +288,8 @@ impl Builder {
     ///     })
     /// }
     /// ```
-    pub fn worker_name<S: AsRef<str>>(mut self, name: S) -> Builder {
-        // TODO save the copy with Into<String>
-        self.worker_name = Some(name.as_ref().to_owned());
+    pub fn worker_name<S: Into<String>>(mut self, name: S) -> Builder {
+        self.worker_name = Some(name.into());
         self
     }
 
@@ -327,13 +334,13 @@ impl Builder {
     ///     .build();
     /// ```
     pub fn build(self) -> ThreadPool {
-        let (tx, rx) = channel::<Thunk<'static>>();
+        let (tx, rx) = self.channel_type.new(&self.channel_bound);
 
         let num_workers = self.num_workers.unwrap_or_else(num_cpus::get);
 
         let shared_data = Arc::new(ThreadPoolSharedData {
             name: self.worker_name,
-            job_receiver: Mutex::new(rx),
+            job_receiver: rx,
             empty_condvar: Condvar::new(),
             empty_trigger: Mutex::new(()),
             join_generation: AtomicUsize::new(0),
@@ -356,9 +363,9 @@ impl Builder {
     }
 }
 
-struct ThreadPoolSharedData {
+struct ThreadPoolSharedData /*<CR: ChannelReceiver<Thunk<'static>>>*/ {
     name: Option<String>,
-    job_receiver: Mutex<Receiver<Thunk<'static>>>,
+    job_receiver: Box<dyn ChannelReceiver>,
     empty_trigger: Mutex<()>,
     empty_condvar: Condvar,
     join_generation: AtomicUsize,
@@ -392,7 +399,7 @@ pub struct ThreadPool {
     //
     // This is the only such Sender, so when it is dropped all subthreads will
     // quit.
-    jobs: Sender<Thunk<'static>>,
+    jobs: Box<dyn ChannelSender>,
     shared_data: Arc<ThreadPoolSharedData>,
 }
 
@@ -709,15 +716,17 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
                 if thread_counter_val >= max_thread_count_val {
                     break;
                 }
-                let message = {
+                // maybe lock the receiver
+                let message = shared_data.job_receiver.receive();
+                /*   {
                     // Only lock jobs for the time it takes
                     // to get a job, not run it.
                     let lock = shared_data
-                        .job_receiver
-                        .lock()
-                        .expect("Worker thread unable to lock job_receiver");
-                    lock.recv()
-                };
+                    .job_receiver
+                    .lock()
+                    .expect("Worker thread unable to lock job_receiver");
+
+                }; */
 
                 let job = match message {
                     Ok(job) => job,
@@ -736,5 +745,5 @@ fn spawn_in_pool(shared_data: Arc<ThreadPoolSharedData>) {
 
             sentinel.cancel();
         })
-        .unwrap();
+        .expect("unable to spawn Worker");
 }

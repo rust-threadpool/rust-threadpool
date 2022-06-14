@@ -1,4 +1,4 @@
-use super::{auto_config, builder, ThreadPool};
+use super::{auto_config, Builder, ChannelType, ThreadPool};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, sync_channel};
 use std::sync::{Arc, Barrier};
@@ -6,6 +6,15 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 
 const TEST_TASKS: usize = 4;
+
+fn builder() -> Builder {
+    let mut b = super::builder();
+    if std::env::var("TEST_CROSSBEAM").is_ok() {
+        //assert!(false);
+        b = b.with(ChannelType::Crossbeam);
+    }
+    b
+}
 
 #[test]
 fn test_set_num_workers_increasing() {
@@ -567,4 +576,22 @@ fn test_join_wavesurfer() {
     }));
 
     clock_thread.join().unwrap();
+}
+
+#[test]
+fn bound_flow() {
+    let pool = builder().queue_size(4).num_workers(2).build();
+
+    for _ in 0..6 {
+        pool.execute(sleepy_function);
+    }
+    sleep(Duration::from_secs(1));
+    assert_eq!(2, pool.active_count(), "{}", pool.active_count());
+    assert_eq!(4, pool.queued_count());
+
+    pool.join();
+
+    fn sleepy_function() {
+        sleep(Duration::from_secs(3));
+    }
 }

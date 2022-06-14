@@ -1,7 +1,7 @@
 [package]
 
 name = "threadpool"
-version = "2.0.0-alpha.1"
+version = "2.0.0-alpha.2"
 edition = "2018"
 authors = ["The Rust Project Developers", "Stefan Schindler <dns2utf8@estada.ch>"]
 license = "MIT/Apache-2.0"
@@ -25,3 +25,12 @@ include = [
 
 [dependencies]
 num_cpus = "1.13.1"
+crossbeam-channel = { version = "0.5.4", optional = true }
+
+[features]
+default = ["crossbeam", "std"]
+crossbeam = ["crossbeam-channel"]
+std = []
+
+[package.metadata.docs.rs]
+all-features = true
