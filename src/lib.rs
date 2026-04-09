@@ -15,6 +15,28 @@
 //!
 //! # Examples
 //!
+//! ## Executing tasks, then joining them
+//!
+//! The simplest use of a thread pool is to execute some number of jobs,
+//! then waiting for their completion.
+//! This can be done with the `join()` method.
+//!
+//! ```
+//! use threadpool::ThreadPool;
+//!
+//! let n_workers = 4;
+//! let n_jobs = 8;
+//! let pool = ThreadPool::new(n_workers);
+//!
+//! for _ in 0..n_jobs {
+//!     pool.execute(move|| {
+//!         // Perform some work
+//!     });
+//! }
+//!
+//! pool.join();
+//! ```
+//!
 //! ## Synchronized with a channel
 //!
 //! Every thread sends one message over the channel, which then is collected with the `take()`.
