@@ -15,22 +15,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [latest, beta, nightly, 1.85.0]
+        rust: [stable, beta, nightly, 1.85.0]
 
     container:
-      image: rust:${{ matrix.rust }}
+      image: rust:latest
 
     steps:
       - uses: actions/checkout@v5
 
       - name: Show toolchain
-        run: rustc --version && cargo --version && uname -a
+        run: rustc +${{ matrix.rust }} --version && cargo +${{ matrix.rust }} --version && uname -a
 
       - name: Build
-        run: cargo build
+        run: cargo +${{ matrix.rust }} build
 
       - name: Run tests
-        run: cargo test
+        run: cargo +${{ matrix.rust }} test
 
       - name: Make Docs
-        run: cargo doc
+        run: cargo +${{ matrix.rust }} doc
