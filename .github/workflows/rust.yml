@@ -1,0 +1,36 @@
+name: Rust
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [latest, beta, nightly, 1.85.0]
+
+    container:
+      image: rust:${{ matrix.rust }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: rustc --version && cargo --version && uname -a
+
+      - name: Build
+        run: cargo build
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Make Docs
+        run: cargo doc
